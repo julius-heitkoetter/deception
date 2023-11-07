@@ -8,8 +8,8 @@ from config import {
     deceiver_base_config,
     supervisor_base_config,
 }
-from modles import LlamaLLM, OpenAILLM, CoT
-from chain import DataLoader, Deceiver, Supervisor, Evaluator
+from bin.modles import LlamaLLM, OpenAILLM, CoT
+from bin.chain import DataLoader, Deceiver, Supervisor, Evaluator
 
 
 deceiver_llm = LlamaLLM(**llama_base_config)
