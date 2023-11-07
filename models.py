@@ -8,7 +8,6 @@ class CoT():
 
     Is called exactly like an LLM, just excecutes a chain of thought to get answer.
     """
-
     pass
 
 class LlamaLLM():
