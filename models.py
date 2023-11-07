@@ -2,6 +2,15 @@ import torch
 import openai
 from typing import Any, Callable, List, Optional
 
+class CoT():
+    """
+    Creates a CoT wrapper around an LLM. 
+
+    Is called exactly like an LLM, just excecutes a chain of thought to get answer.
+    """
+
+    pass
+
 class LlamaLLM():
     """
     Loading the Llama LLM from facebook. Make sure that the model
