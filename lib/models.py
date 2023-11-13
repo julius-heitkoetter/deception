@@ -2,13 +2,169 @@ import torch
 import openai
 from typing import Any, Callable, List, Optional
 
+import numpy as np
+import itertools
+
 class CoT():
     """
     Creates a CoT wrapper around an LLM. 
 
     Is called exactly like an LLM, just excecutes a chain of thought to get answer.
     """
-    pass
+
+    num_steps: int = 3               # the depth of the chain of thought tree
+    num_select_sample: int = 2       # how many samples to keep exploring at the level of the tree
+    num_generate_samples: int = 3    # how many samples to generate for each sample of the tree (branching fraction)
+    verbose: bool = False            # weather or not to print out the CoT
+    selection_method: str = 'greedy' # Describes how set of best possible solutions is selected. Can either be 'greedy' or 'sample'.
+    max_num_tries: int = 3           # maximum number of tries to get a score or final answer before it gives up.
+    return_boolean: bool = True      # flag which, when set to true, forces CoT to output a boolean string (either "true" or "false")
+    get_samples_prompt: str = ''     # prompt to get the samples
+    get_scores_prompt: str = ''      # prompt to get the scores
+    get_answer_prompt: str = ''      # prompt to get the final answer
+
+    def __init__(self, llm, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+        
+        self.llm = llm
+
+        if len(self.get_samples_prompt) == 0:
+            raise AssertionError('Sample prompt must be included in CoT configuration')
+        if len(self.get_scores_prompt) == 0:
+            raise AssertionError('Score prompt must be included in CoT configuration')
+        if len(self.get_answer_prompt) == 0:
+            raise AssertionError('Answer prompt must be included in CoT configuration')
+
+    def get_samples(self,x, y):
+        samples = []
+        for _ in range(self.num_generate_samples):
+            prompt = self.get_samples_prompt.format(
+                    Problem=x, 
+                    Previous_CoT=y
+            )
+            samples.append(self.llm(prompt = prompt))
+        return samples
+
+    def get_score(self,x,y):
+        score = None
+        num_tries = 0
+        while score is None and num_tries < self.max_num_tries:
+
+            prompt = self.get_scores_prompt.format(
+                        CoT=x,
+            )
+            potential_score = self.llm(prompt=prompt)
+
+            try:
+                score = int(potential_score)
+            except ValueError as e:
+                score = None
+                if self.verbose:
+                    print("INFO: Failed to get properly formatted score, trying again.")
+
+            num_tries +=1
+
+        if score is None: 
+            score = 0
+            if self.verbose:
+                print("ERROR: Failed to get properly formatted score. Returning 0")
+
+        return score
+    
+    def get_final_answer(self,x, y):
+        
+        prompt = self.get_answer_prompt.format(
+            Problem = x,
+            CoT = y,
+        )
+
+        return self.llm(prompt = prompt)
+
+    def get_final_bool_answer(self,x, y):
+        
+        num_tries = 0
+        answer = None
+        while answer is None and num_tries < self.max_num_tries:
+            prompt = self.get_answer_prompt.format(
+                Problem = x,
+                CoT = y,
+            )
+            potential_answer = self.llm(prompt=prompt)
+            
+            if True:   #TODO, make an actual check to see if the potential answer is a boolean
+                answer = potential_answer
+            elif self.verbose:
+                print("INFO: Failed to get properly formatted final answer, trying again.")
+
+            num_tries += 1
+
+        if answer is None: 
+            answer = ""
+            if self.verbose:
+                print("ERROR: Failed to get properly formatted final answer. Returning blank string")
+
+        return answer
+ 
+    def solve(self,x):
+        ys = [''] #current output candidates
+        infos = []
+
+        for step in range(self.num_steps):
+
+            #generation
+            new_ys = [self.get_samples(x, y) for y in ys]
+            new_ys = list(itertools.chain(*new_ys))
+            ids = list(range(len(new_ys)))
+
+            #evaluation 
+            values = [self.get_score(x, y) for y in new_ys]
+
+            #selection
+            if self.selection_method == 'greedy':     
+                # gets the best N=num_select_sample choices
+                select_ids = sorted(ids, key=lambda x: values[x], reverse=True)[:self.num_select_sample]
+            elif self.selection_method == 'sample':
+                # weighted samples from all possible options to get N=num_select_sample choices.
+                ps = np.array(values) / sum(values)
+                select_ids = np.random.choice(ids, size=self.num_select_sample, p=ps).tolist()
+            select_new_ys = [new_ys[select_id] for select_id in select_ids]
+            select_new_values = [values[select_id] for select_id in select_ids]
+
+            #logging
+            infos.append({'step':step, 'x':x, 'ys':ys, 'new_ys':new_ys, 'values':values, 'select_new_ys':select_new_ys})
+
+            #preparation for next loop
+            ys = select_new_ys
+        
+        if self.verbose:
+            print("INFO: Chain of thought information ", infos)
+
+        return ys, select_new_values
+    
+    def __call__(self, prompt):
+        ys, values = self.solve(prompt)
+        ids = list(range(len(ys)))
+
+        #selection to get best final answer
+        if self.selection_method == 'greedy':     
+            # gets the best N=num_select_sample choices
+            select_ids = sorted(ids, key=lambda x: values[x], reverse=True)[:1]
+        elif self.selection_method == 'sample':
+            # weighted samples from all possible options to get N=num_select_sample choices.
+            ps = np.array(values) / sum(values)
+            select_ids = np.random.choice(ids, size=1, p=ps).tolist()
+        final_CoT = [ys[select_id] for select_id in select_ids][0]
+
+        #extract the final answer from the last chain of thoughti
+        if self.return_boolean:
+            final_answer =  self.get_final_bool_answer(prompt,final_CoT)
+        else:
+            final_answer =  self.get_final_answer(prompt,final_CoT)
+        
+        return final_answer
+
+
 
 class LlamaLLM():
     """
@@ -106,7 +262,6 @@ class OpenAILLM():
         stop: Optional[List[str]] = None,
     ) -> str:
         
-        print("asking")
         
         system_intel = "You are OpenAI's GPT model, answer my questions as correctly as you can."
 
