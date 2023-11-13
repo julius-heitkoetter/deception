@@ -191,6 +191,8 @@ class LlamaLLM():
     tokenizer: Callable = None
     llama_model: Callable = None
 
+    verbose: bool = False         # If true, will print out every input, output processes
+
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -221,6 +223,9 @@ class LlamaLLM():
         prompt: str = None,
         stop: Optional[List[str]] = None,
     ) -> str:
+        
+        if self.verbose:
+            print("INFO: input to Llama2 LLM: ", prompt)
 
         # prepare input
         batch = self.tokenizer(["[INST]" + prompt + "[/INST]"], padding='max_length', truncation=True,max_length=self.max_padding_length,return_tensors="pt")
@@ -242,13 +247,18 @@ class LlamaLLM():
                 )
             
         output_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        answer = output_text[output_text.rfind("[/INST]") + len("[/INST]"):]
 
-        return output_text[output_text.rfind("[/INST]") + len("[/INST]"):]
+        if self.verbose:
+            print("INFO: output from Llama2 LLM: ", answer)
+
+        return answer
 
 class OpenAILLM():
 
     model_name: str = None        # Name of the model (gpt-4, gpt-3.5-turbo, etc.)
     temperature: float = 1        # Temperature (variability) of the model
+    verbose: bool = False         # If true, will print out every input, output processes
 
     def __init__(self,**kwargs):
         for key, value in kwargs.items():
@@ -262,6 +272,8 @@ class OpenAILLM():
         stop: Optional[List[str]] = None,
     ) -> str:
         
+        if self.verbose:
+            print("INFO: input to OpenAI LLM: ", prompt)
         
         system_intel = "You are OpenAI's GPT model, answer my questions as correctly as you can."
 
@@ -269,4 +281,9 @@ class OpenAILLM():
                                  messages=[{"role": "system", "content": system_intel},
                                            {"role": "user", "content": prompt}])
         
-        return result['choices'][0]['message']['content']
+        answer = result['choices'][0]['message']['content']
+
+        if self.verbose:
+            print("INFO: output from Llama2 LLM: ", answer)
+        
+        return answer
