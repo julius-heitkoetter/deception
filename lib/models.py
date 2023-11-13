@@ -10,6 +10,8 @@ class CoT():
     Creates a CoT wrapper around an LLM. 
 
     Is called exactly like an LLM, just excecutes a chain of thought to get answer.
+
+    Based on code from this paper: https://arxiv.org/pdf/2305.10601.pdf
     """
 
     num_steps: int = 3               # the depth of the chain of thought tree
@@ -29,6 +31,7 @@ class CoT():
         
         self.llm = llm
 
+        # Check if the neccessary prompts have been loaded into the config
         if len(self.get_samples_prompt) == 0:
             raise AssertionError('Sample prompt must be included in CoT configuration')
         if len(self.get_scores_prompt) == 0:
@@ -37,6 +40,13 @@ class CoT():
             raise AssertionError('Answer prompt must be included in CoT configuration')
 
     def get_samples(self,x, y):
+        """
+        Takes an input problem, x, and an existing chain of thought, y, 
+        and outputs a continued/enchanced chain of thought.
+
+        Note that y may simply be an empty string, especially if this is
+        in the first layer of the CoT. 
+        """
         samples = []
         for _ in range(self.num_generate_samples):
             prompt = self.get_samples_prompt.format(
@@ -47,12 +57,23 @@ class CoT():
         return samples
 
     def get_score(self,x,y):
+        """
+        Takes as input a problem, x, and a chain of thought about that
+        problem, y, and returns an integer to rate how likely the chain
+        of thought is able to solve the problem.
+
+        1 means that the thougths on correctness are fundamentally incorrect, 
+        5 means that the thoughts on correctness are correct but do not reach a conclusion
+        10 means the thoughts on correctness reach a solid conclusion.
+        
+        Note that this method returns 0 if it cannot get a proper integer from the llm
+        """
         score = None
         num_tries = 0
         while score is None and num_tries < self.max_num_tries:
 
             prompt = self.get_scores_prompt.format(
-                        CoT=x,
+                        CoT=y,
             )
             potential_score = self.llm(prompt=prompt)
 
@@ -73,6 +94,10 @@ class CoT():
         return score
     
     def get_final_answer(self,x, y):
+        """
+        Takes as input a problem, x, and a chain of thought, y, and returns
+        an answer to the problem, stripped of all the chains of thought.
+        """
         
         prompt = self.get_answer_prompt.format(
             Problem = x,
@@ -82,6 +107,14 @@ class CoT():
         return self.llm(prompt = prompt)
 
     def get_final_bool_answer(self,x, y):
+        """
+        Takes as input a problem, x, and a chain of thought, y, and returns
+        an answer to the problem, stripped of all the chains of thought.
+
+        Note that this method forces the output to be a string representing
+        a boolean. If after max_num_tries this is not the case, this method
+        will output an empty string as the answer. 
+        """
         
         num_tries = 0
         answer = None
@@ -107,6 +140,25 @@ class CoT():
         return answer
  
     def solve(self,x):
+        """
+        Executes the equivalent of BFS solve to use a tree of thoughts to solve the problem.
+
+        For each level of the tree of thoughts this algorithm executes these steps:
+            (1) for each node at the previous level, the algorithm
+                generates a set of samples which are continuations
+                (or initializations if the node is the root) of
+                chains of thoughts.
+            (2) for each continuation of a chain of thoughts produced
+                at this level, the language model ranks them in order
+                of likelihood of answering the problem correctly
+            (3) the algorithm selects a set of thoughts to keep based 
+                on the above scoring
+
+        Returns a list of thoughts, ys, which are the most likely 
+        candidates to being correct chains of thoughts to solve the 
+        problem at the bottom of the tree.
+        """
+
         ys = [''] #current output candidates
         infos = []
 
@@ -143,6 +195,16 @@ class CoT():
         return ys, select_new_values
     
     def __call__(self, prompt):
+        """
+        Calls the Chain of thoughts algorithm to get list of most
+        likely thoughts.
+
+        After, the method asks a final answer evaluator to get the 
+        final answer from the best chainof thoughts produced at the 
+        lowest level of the tree. 
+
+        Returns a string containing the answer to the prompt
+        """
         ys, values = self.solve(prompt)
         ids = list(range(len(ys)))
 
