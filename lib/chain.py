@@ -1,10 +1,10 @@
 import typing as T
 from abc import ABC
-from config import {
+from config import (
     deceiver_base_config,
     supervisor_base_config,
     evaluator_base_config,
-}
+)
 
 class DataLoader:
     """
