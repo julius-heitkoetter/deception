@@ -18,13 +18,25 @@ print(dataset)
 
 # Step 1: create "explanation"
 dataset = run_on_dataset(dataset, deceiver)
+print("Dataset at step 1: create explanations")
 print(dataset)
 
-exit()
+with open("test/data/qae_testsmall", "w") as f:
+    json.dump(dataset, f, indent=4)
+
 # Step 2: create "verdict"
 dataset = run_on_dataset(dataset, supervisor)
+print("Dataset at step 2: create verdicts")
 print(dataset)
+
+with open("test/data/qaev_testsmall", "w") as f:
+    json.dump(dataset, f, indent=4)
 
 # Step 3: create "verdict-without-explanation"
 dataset = run_on_dataset(dataset, evaluator)
+print("Dataset at step 0: create verdicts without explanation")
 print(dataset)
+
+with open("test/data/qaev_testsmall_complete.json", "w") as f:
+    json.dump(dataset, f, indent=4)
+

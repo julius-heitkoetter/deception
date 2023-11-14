@@ -70,9 +70,9 @@ class Supervisor(DatasetLLM):
             Explanation = qae["explanation"],
         )
 
-        qa["verdict"] = self.llm(prompt=prompt)
+        qae["verdict"] = self.llm(prompt=prompt)
 
-        return qa
+        return qae
 
 
 class Evaluator(DatasetLLM):
@@ -84,8 +84,8 @@ class Evaluator(DatasetLLM):
         super().__init__(llm)
 
     def __call__(self, qa: T.Dict):
-        assert "question" in qae
-        assert "answer" in qae
+        assert "question" in qa
+        assert "answer" in qa
 
         prompt = evaluator_base_config["prompt"].format(
             Question = qa["question"],
@@ -103,10 +103,9 @@ def run_on_dataset(dataset: T.List[T.Dict], model: T.Union[Deceiver, Supervisor,
     """
     data = dataset["data"]
 
-    for item in data:
-        dataset[item] = model(item)
+    updated_data = [model(item) for item in data]
 
-    dataset["data"] = data
+    dataset["data"] = updated_data
 
     return dataset
 
