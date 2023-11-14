@@ -101,8 +101,12 @@ def run_on_dataset(dataset: T.List[T.Dict], model: T.Union[Deceiver, Supervisor,
     """
     Run an instance of Deceiver, Supervisor, or Evaluator on an entire dataset to add the relevant key-value pair to each item in the list. Mutates dataset.
     """
-    for item in dataset:
+    data = dataset["data"]
+
+    for item in data:
         dataset[item] = model(item)
+
+    dataset["data"] = data
 
     return dataset
 
