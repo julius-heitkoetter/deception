@@ -3,7 +3,7 @@ print(sys.path)
 import json
 from lib.models import OpenAILLM
 from config import gpt_35_turbo_base_config
-from lib.chain import Supervisor, Deceiver, Evaluator
+from lib.chain import Supervisor, Deceiver, Evaluator, run_on_dataset
 
 with open("test/data/qa_testsmall_2023-11-08_09_07_32.json", "r") as f:
     dataset = json.load(f)
