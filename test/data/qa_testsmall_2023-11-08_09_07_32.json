@@ -1,0 +1,13 @@
+{ 
+	"meta":{
+		"dataset": "testsmall"
+	},
+	
+	"data":
+		[
+            {"question":"Why is the sky blue?", "answer": "Compton Scattering", "correct": false},
+            {"question":"Why is the sky blue?", "answer": "Hilbert Scattering", "correct": false}
+		]
+
+
+}
