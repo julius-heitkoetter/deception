@@ -1,18 +1,19 @@
-import typing as T
-import json
 import sys
 import os
-from pathlib import Path
-from datetime import datetime
+import platform
+
+import typing as T
+import json
 from abc import ABC
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "lib"))
-
 from datasets import load_dataset
-from utils import upload_json_to_hf
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "lib"))
-from utils import save_json_locally, get_json_locally
+
+if platform.system() == "Windows":
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "lib"))
+    from utils import save_json_locally, get_json_locally, upload_json_to_hf
+else:
+    from lib.utils import save_json_locally, get_json_locally, upload_json_to_hf
+
 
 ETHICS_CATEGORIES = ['commonsense', 'deontology', 'justice', 'utilitarianism', 'virtue']
 MMLU_CATEGORIES = ['abstract_algebra', 'anatomy', 'astronomy', 'business_ethics', 'clinical_knowledge', 'college_biology', 'college_chemistry', 'college_computer_science', 'college_mathematics', 'college_medicine', 'college_physics', 'computer_security', 'conceptual_physics', 'econometrics', 'electrical_engineering', 'elementary_mathematics', 'formal_logic', 'global_facts', 'high_school_biology', 'high_school_chemistry', 'high_school_computer_science', 'high_school_european_history', 'high_school_geography', 'high_school_government_and_politics', 'high_school_macroeconomics', 'high_school_mathematics', 'high_school_microeconomics', 'high_school_physics', 'high_school_psychology', 'high_school_statistics', 'high_school_us_history', 'high_school_world_history', 'human_aging', 'human_sexuality', 'international_law', 'jurisprudence', 'logical_fallacies', 'machine_learning', 'management', 'marketing', 'medical_genetics', 'miscellaneous', 'moral_disputes', 'moral_scenarios', 'nutrition', 'philosophy', 'prehistory', 'professional_accounting', 'professional_law', 'professional_medicine', 'professional_psychology', 'public_relations', 'security_studies', 'sociology', 'us_foreign_policy', 'virology', 'world_religions']
@@ -21,9 +22,10 @@ class DataLoader(ABC):
     """
     Creates qa
     """
-
-    def __init__(self,):
-        pass
+    
+    def __init__(self, dataset_name, hf_dataset_src_path):
+        self.dataset_name = dataset_name
+        self.hf_dataset_src_path = hf_dataset_src_path
 
     def __call__(self,):
         pass
@@ -33,13 +35,27 @@ class MMLULoader(DataLoader):
         """
         Creates an instance of a dataloader for MMLU dataset
         """
-        #super().__init__()
-        self.dataset_name = 'mmlu'
-        self.hf_dataset_src_path = 'cais/mmlu'
-        self.MMLU_CATEGORIES = ['abstract_algebra', 'anatomy', 'astronomy', 'business_ethics', 'clinical_knowledge', 'college_biology', 'college_chemistry', 'college_computer_science', 'college_mathematics', 'college_medicine', 'college_physics', 'computer_security', 'conceptual_physics', 'econometrics', 'electrical_engineering', 'elementary_mathematics', 'formal_logic', 'global_facts', 'high_school_biology', 'high_school_chemistry', 'high_school_computer_science', 'high_school_european_history', 'high_school_geography', 'high_school_government_and_politics', 'high_school_macroeconomics', 'high_school_mathematics', 'high_school_microeconomics', 'high_school_physics', 'high_school_psychology', 'high_school_statistics', 'high_school_us_history', 'high_school_world_history', 'human_aging', 'human_sexuality', 'international_law', 'jurisprudence', 'logical_fallacies', 'machine_learning', 'management', 'marketing', 'medical_genetics', 'miscellaneous', 'moral_disputes', 'moral_scenarios', 'nutrition', 'philosophy', 'prehistory', 'professional_accounting', 'professional_law', 'professional_medicine', 'professional_psychology', 'public_relations', 'security_studies', 'sociology', 'us_foreign_policy', 'virology', 'world_religions']
+        super().__init__(
+            dataset_name = 'mmlu',
+            hf_dataset_src_path = 'cais/mmlu'
+        )
 
-    def __call__(self, category, data_split='test'):
-        assert category in self.MMLU_CATEGORIES
+    def __call__(self, category: str, data_split: str ='test'):
+        """
+        Returns json files of correct (and incorrect) responses.
+        json structure: {
+            'metadata': {'dataset': 'dataset_name-category', 'correct': True/False}
+            'data': [{'question': 'question text goes here', 'answer': answer text goes here, 'correct': True/False}, ...]
+        }
+
+        Inputs:
+            category (str) - 
+            data_split (str)
+
+        Outupts:
+        - json file in the format 
+        """
+        assert category in MMLU_CATEGORIES
         return self.mmlu_to_json(self.dataset_name, self.hf_dataset_src_path, category, data_split)
 
     def mmlu_to_json(self, dataset_name, dataset_path, category, split):
@@ -61,12 +77,10 @@ class MMLULoader(DataLoader):
 
 class EthicsLoader(DataLoader):
     def __init__(self):
-
-        #super().__init__()
-        self.dataset_name = 'ethics'
-        self.hf_dataset_src_path = 'hendrycks/ethics'
-        
-        self.ETHICS_CATEGORIES = ['commonsense', 'deontology', 'justice', 'utilitarianism', 'virtue']
+        super().__init__(
+            dataset_name = 'ethics',
+            hf_dataset_src_path = 'hendrycks/ethics'
+        )
 
         self.ethics_data_extractors = {
             'commonsense': self.commonsense_data_extractor,
@@ -83,7 +97,7 @@ class EthicsLoader(DataLoader):
         # 
         # output: dataset
 
-        assert category in self.ETHICS_CATEGORIES
+        assert category in ETHICS_CATEGORIES
         return self.ethics_to_json(self.dataset_name, self.hf_dataset_src_path, category, split=data_split)
 
     def ethics_to_json(self, dataset_name, dataset_path, category, split):
@@ -153,20 +167,17 @@ class EthicsLoader(DataLoader):
 
     def virtue_data_extractor(self, question_data, json_dict_correct, json_dict_incorrect):
         is_correct = question_data['label'] == 1
+        answer_strings = (
+            "The emotion matches the scenario.",
+            "The emotion does not match the scenario."
+        )
         json_dict_correct['data'].append({
             'question': question_data['question'],
-            'answer': is_correct,
+            'answer': answer_strings[int(is_correct)],
             'correct': True
         })
         json_dict_incorrect['data'].append({
             'question': question_data['question'],
-            'answer': not is_correct,
+            'answer': answer_strings[int(not is_correct)],
             'correct': False
         })
-
-
-mmlu_dataloader = MMLULoader()
-ethics_dataloader = EthicsLoader()
-
-#print(mmlu_dataloader('astronomy', data_split='dev'))
-print(ethics_dataloader('deontology', data_split='test'))
