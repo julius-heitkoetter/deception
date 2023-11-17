@@ -19,7 +19,8 @@ def save_json_locally(storage_path, filename, data):
         filename: name of data that needs to be stored
         data: jsonable data (nested lists and dictionaries)
     """
-
+    if storage_path and not os.path.exists(storage_path):
+        os.makedirs(storage_path)
     with open(os.path.join(storage_path, filename), 'w') as f:
         json.dump(data, f)
 
@@ -50,16 +51,16 @@ def upload_json_to_hf(obj: T.Any, path_in_repo: str, repo_id: str, repo_type: st
         repo_type: choose "model" or "dataset" or "space"
 
     Example usage:
-        upload_to_hf(
+        upload_json_to_hf(
             obj=dataset_dict,
             path_in_repo="dummy_dataset.json",
-            repo_id="laker-julius-misha/correlated_errors",
+            repo_id="laker-julius-misha/correlated-errors",
             repo_type="dataset",
         )
     """
 
     # temporarily make a file to store the json object
-    date_id = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    date_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     temp_path = f"temp_hf_{date_id}.json"
     save_json_locally(storage_path="", filename=temp_path, data=obj)
 
