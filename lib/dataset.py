@@ -68,7 +68,6 @@ class DataLoader(ABC):
     
     def upload_file(self, data: dict, save_locally: bool = False, save_on_hf: bool = False):
         date_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        print(data['metadata']['correct'] == True, data['metadata']['correct'])
         correct_incorrect = "correct" if data['metadata']['correct'] else "incorrect"
         category = data['metadata']['category']
         file_name = f"qa-{correct_incorrect}-{self.dataset_name}-{category}-{date_id}.json"
@@ -98,7 +97,7 @@ class MMLULoader(DataLoader):
 
         )
 
-    def __call__(self, category: str, data_split: str ='test', save_locally: bool = False, save_on_hf: bool = True):
+    def __call__(self, category: str, data_split: str ='dev', save_locally: bool = False, save_on_hf: bool = True):
         """
         Returns json files of correct (and incorrect) responses.
         json structure: {
@@ -163,7 +162,7 @@ class EthicsLoader(DataLoader):
             'virtue': self.virtue_data_extractor 
         }
 
-    def __call__(self, category, data_split='test'):
+    def __call__(self, category, data_split='test', save_locally: bool = False, save_on_hf: bool = True):
         """
         Returns json files of correct (and incorrect) responses.
         json structure: {
@@ -189,7 +188,7 @@ class EthicsLoader(DataLoader):
         incorrect_path = self.upload_file(json_incorrect, save_locally=save_locally, save_on_hf=save_on_hf)
 
         return correct_path, incorrect_path
-        
+
     def _ethics_to_json(self, category, split):
         json_dict_correct = self.new_json(category=category, correct=True)
         json_dict_incorrect = self.new_json(category=category, correct=False)
