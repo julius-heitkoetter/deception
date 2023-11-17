@@ -33,7 +33,8 @@ MMLU_CATEGORIES = ['abstract_algebra', 'anatomy', 'astronomy', 'business_ethics'
                     'professional_psychology', 'public_relations', 'security_studies', 'sociology', 
                     'us_foreign_policy', 'virology', 'world_religions']
 
-
+MMLU_DATA_SPLITS = {'auxiliary_train', 'test', 'validation', 'dev'}
+ETHICS_DATA_SPLITS = {'train', 'test', 'validation'}
 
 class DataLoader(ABC):
     """
@@ -97,8 +98,6 @@ class MMLULoader(DataLoader):
 
         )
 
-        self.MMLU_DATA_SPLITS = {'auxiliary_train', 'test', 'validation', 'dev'}
-
     def __call__(self, category: str, data_split: str ='test', save_locally: bool = False, save_on_hf: bool = True):
         """
         Returns json files of correct (and incorrect) responses.
@@ -116,7 +115,7 @@ class MMLULoader(DataLoader):
             (tuple[str]) path/filenames to json files 
         """
         assert category in MMLU_CATEGORIES, f"category: {category} not in MMLU categories"
-        assert data_split in self.MMLU_DATA_SPLITS, f"data split: {data_split} not in MMLU data splits"
+        assert data_split in MMLU_DATA_SPLITS, f"data split: {data_split} not in MMLU data splits"
 
         json_correct, json_incorrect = self._mmlu_to_json(category, data_split)
 
@@ -182,12 +181,19 @@ class EthicsLoader(DataLoader):
         """
 
         assert category in ETHICS_CATEGORIES
-        return self._ethics_to_json(self.dataset_name, self.hf_dataset_src_path, category, split=data_split)
+        assert data_split in ETHICS_DATA_SPLITS, f"data split: {data_split} not in Ethics data splits"
 
-    def _ethics_to_json(self, dataset_name, dataset_path, category, split):
+        json_correct, json_incorrect = self._ethics_to_json(category, data_split)
+
+        correct_path = self.upload_file(json_correct, save_locally=save_locally, save_on_hf=save_on_hf)
+        incorrect_path = self.upload_file(json_incorrect, save_locally=save_locally, save_on_hf=save_on_hf)
+
+        return correct_path, incorrect_path
+        
+    def _ethics_to_json(self, category, split):
         json_dict_correct = self.new_json(category=category, correct=True)
         json_dict_incorrect = self.new_json(category=category, correct=False)
-        for question_data in load_dataset(dataset_path, category, split=split):
+        for question_data in load_dataset(self.hf_dataset_src_path, category, split=split):
             self.ethics_data_extractors[category](question_data, json_dict_correct, json_dict_incorrect)
         return json_dict_correct, json_dict_incorrect
 
