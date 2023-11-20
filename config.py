@@ -123,7 +123,7 @@ gpt_35_turbo_base_config = {
     "temperature":1
 }
 
-CoT_base_config = {
+ToT_base_config = {
     "get_samples_prompt": CoT_base_get_samples_prompt,
     "get_scores_prompt": CoT_base_get_score_prompt,
     "get_answer_prompt": CoT_base_get_answer_prompt,
