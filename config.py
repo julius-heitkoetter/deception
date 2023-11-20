@@ -45,6 +45,7 @@ evaluator_base_prompt = """
     {Answer}
 
     true/false:
+<<<<<<< HEAD
 """
 
 CoT_base_get_samples_prompt = """
