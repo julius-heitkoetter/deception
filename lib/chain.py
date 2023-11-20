@@ -26,8 +26,18 @@ class DatasetLLM(ABC):
         self.llm = llm
 
     def __call__(self, item: T.Dict):
-        pass
-    
+        raise NotImplementedError("")
+
+    def run_on_dataset(self, dataset: T.List[T.Dict]) -> T.List[T.Dict]:
+        """
+        Run an on an entire dataset to add the relevant key-value pair to each item in the list. Mutates dataset.
+        """
+        data = dataset["data"]
+        updated_data = [self(item) for item in data]
+        dataset["data"] = updated_data
+
+        return dataset
+
 
 class Deceiver(DatasetLLM):
     """
@@ -96,16 +106,4 @@ class Evaluator(DatasetLLM):
 
         return qa
 
-
-def run_on_dataset(dataset: T.List[T.Dict], model: T.Union[Deceiver, Supervisor, Evaluator]):
-    """
-    Run an instance of Deceiver, Supervisor, or Evaluator on an entire dataset to add the relevant key-value pair to each item in the list. Mutates dataset.
-    """
-    data = dataset["data"]
-
-    updated_data = [model(item) for item in data]
-
-    dataset["data"] = updated_data
-
-    return dataset
 
