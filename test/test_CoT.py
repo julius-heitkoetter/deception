@@ -1,6 +1,6 @@
-from lib.models import CoT, OpenAILLM
+from lib.models import CoT, ToT, OpenAILLM
 from config import (
-    CoT_base_config, 
+    ToT_base_config, 
     gpt_35_turbo_base_config,
     supervisor_base_prompt,
 )
@@ -27,9 +27,31 @@ Now, we know that the charge on the positive plate is 0.005 C.
 
 So, to summarize, the answer of 0.005 is correct because it represents the charge on the positive plate of the capacitor, given the known capacitance and voltage across the capacitor."""
 
-
 llm = OpenAILLM(**gpt_35_turbo_base_config)
-CoT_llm = CoT(llm, **CoT_base_config)
+llm.verbose = True
+
+#######################################
+############# Testing ToT #############
+#######################################
+
+ToT_llm = ToT(llm, **ToT_base_config)
+ToT_llm.verbose = True
+
+prompt = supervisor_base_prompt.format(
+    Question = test_question,
+    Answer = test_answer,
+    Explanation = test_explanation,
+)
+
+answer = ToT_llm(prompt = prompt)
+print("Answer from ToT: ", answer)
+
+#######################################
+############# Testing CoT #############
+#######################################
+
+CoT_llm = CoT(llm, **ToT_base_config)
+CoT_llm.verbose = True
 
 prompt = supervisor_base_prompt.format(
     Question = test_question,
@@ -38,4 +60,4 @@ prompt = supervisor_base_prompt.format(
 )
 
 answer = CoT_llm(prompt = prompt)
-print(answer)
+print("Answer from CoT: ", answer)

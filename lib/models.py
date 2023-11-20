@@ -5,11 +5,11 @@ from typing import Any, Callable, List, Optional
 import numpy as np
 import itertools
 
-class CoT():
+class ToT():
     """
-    Creates a CoT wrapper around an LLM. 
+    Creates a ToT wrapper around an LLM. 
 
-    Is called exactly like an LLM, just excecutes a chain of thought to get answer.
+    Is called exactly like an LLM, just executes a chain of thought to get answer.
 
     Based on code from this paper: https://arxiv.org/pdf/2305.10601.pdf
     """
@@ -21,9 +21,9 @@ class CoT():
     selection_method: str = 'greedy' # Describes how set of best possible solutions is selected. Can either be 'greedy' or 'sample'.
     max_num_tries: int = 3           # maximum number of tries to get a score or final answer before it gives up.
     return_boolean: bool = True      # flag which, when set to true, forces CoT to output a boolean string (either "true" or "false")
-    get_samples_prompt: str = ''     # prompt to get the samples
-    get_scores_prompt: str = ''      # prompt to get the scores
-    get_answer_prompt: str = ''      # prompt to get the final answer
+    get_samples_prompt: str = ''     # prompt to get the samples. Requires "Problem" and "Previous_CoT" as placeholders
+    get_scores_prompt: str = ''      # prompt to get the scores. Requiress "CoT" as a placeholder.
+    get_answer_prompt: str = ''      # prompt to get the final answer. Requires "CoT" and "Problem" as a placeholder.
 
     def __init__(self, llm, **kwargs):
         for key, value in kwargs.items():
@@ -39,7 +39,7 @@ class CoT():
         if len(self.get_answer_prompt) == 0:
             raise AssertionError('Answer prompt must be included in CoT configuration')
 
-    def get_samples(self,x, y):
+    def get_samples(self, problem, previous_CoT):
         """
         Takes an input problem, x, and an existing chain of thought, y, 
         and outputs a continued/enchanced chain of thought.
@@ -50,13 +50,13 @@ class CoT():
         samples = []
         for _ in range(self.num_generate_samples):
             prompt = self.get_samples_prompt.format(
-                    Problem=x, 
-                    Previous_CoT=y
+                    Problem=problem, 
+                    Previous_CoT=previous_CoT,
             )
             samples.append(self.llm(prompt = prompt))
         return samples
 
-    def get_score(self,x,y):
+    def get_score(self, problem, CoT):
         """
         Takes as input a problem, x, and a chain of thought about that
         problem, y, and returns an integer to rate how likely the chain
@@ -73,7 +73,7 @@ class CoT():
         while score is None and num_tries < self.max_num_tries:
 
             prompt = self.get_scores_prompt.format(
-                        CoT=y,
+                        CoT = CoT,
             )
             potential_score = self.llm(prompt=prompt)
 
@@ -93,20 +93,20 @@ class CoT():
 
         return score
     
-    def get_final_answer(self,x, y):
+    def get_final_answer(self, problem, CoT):
         """
         Takes as input a problem, x, and a chain of thought, y, and returns
         an answer to the problem, stripped of all the chains of thought.
         """
         
         prompt = self.get_answer_prompt.format(
-            Problem = x,
-            CoT = y,
+            Problem = problem,
+            CoT = CoT,
         )
 
         return self.llm(prompt = prompt)
 
-    def get_final_bool_answer(self,x, y):
+    def get_final_bool_answer(self, problem, CoT):
         """
         Takes as input a problem, x, and a chain of thought, y, and returns
         an answer to the problem, stripped of all the chains of thought.
@@ -120,12 +120,13 @@ class CoT():
         answer = None
         while answer is None and num_tries < self.max_num_tries:
             prompt = self.get_answer_prompt.format(
-                Problem = x,
-                CoT = y,
+                Problem = problem,
+                CoT = CoT,
             )
             potential_answer = self.llm(prompt=prompt)
             
-            if True:   #TODO, make an actual check to see if the potential answer is a boolean
+            cleaned = potential_answer.lower().strip()
+            if cleaned == "true" or cleaned == "false": #check if answer is a boolean
                 answer = potential_answer
             elif self.verbose:
                 print("INFO: Failed to get properly formatted final answer, trying again.")
@@ -142,6 +143,8 @@ class CoT():
     def solve(self,x):
         """
         Executes the equivalent of BFS solve to use a tree of thoughts to solve the problem.
+        
+            x: the input prompt given to the ToT
 
         For each level of the tree of thoughts this algorithm executes these steps:
             (1) for each node at the previous level, the algorithm
@@ -218,13 +221,46 @@ class CoT():
             select_ids = np.random.choice(ids, size=1, p=ps).tolist()
         final_CoT = [ys[select_id] for select_id in select_ids][0]
 
-        #extract the final answer from the last chain of thoughti
+        #extract the final answer from the last chain of thought
         if self.return_boolean:
             final_answer =  self.get_final_bool_answer(prompt,final_CoT)
         else:
             final_answer =  self.get_final_answer(prompt,final_CoT)
         
         return final_answer
+    
+class CoT(ToT):
+    """
+    Creates a CoT wrapper around an LLM
+    
+    Is a special instance of ToT where the branching fraction,
+    tree depth, and selection number are all 1. This means that
+    the LLM is just prompted once to use CoT. 
+    """
+    
+    num_steps: int = 1               # the depth of the chain of thought tree
+    num_select_sample: int = 1       # how many samples to keep exploring at the level of the tree
+    num_generate_samples: int = 1    # how many samples to generate for each sample of the tree (branching fraction)
+    
+    def __init__(self,llm, **kwargs):
+        
+        super().__init__(llm, **kwargs)
+        
+        if self.num_steps != 1:
+            self.num_steps = 1 
+            if self.verbose:
+                print("INFO: overriding num_samples to be 1 for CoT")
+                
+        if self.num_select_sample != 1:
+            self.num_select_sample = 1 
+            if self.verbose:
+                print("INFO: overriding num_select_sample to be 1 for CoT")
+                
+        if self.num_generate_samples != 1:
+            self.num_generate_samples = 1 
+            if self.verbose:
+                print("INFO: overriding num_generate_samples to be 1 for CoT")
+    
 
 
 
