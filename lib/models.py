@@ -382,7 +382,7 @@ class OpenAILLM():
         answer = result['choices'][0]['message']['content']
 
         if self.verbose:
-            print("INFO: output from Llama2 LLM: ", answer)
+            print("INFO: output from OpenAI LLM: ", answer)
         
         return answer
 
