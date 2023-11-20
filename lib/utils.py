@@ -6,7 +6,6 @@ from datetime import datetime
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from huggingface_hub import hf_hub_download, HfApi
-from datasets import load_dataset
 import requests
 
 
@@ -105,3 +104,63 @@ def download_pretrained_model_from_hf(model: str) -> T.Tuple[T.Any, T.Any]:
     tokenizer = AutoTokenizer.from_pretrained(model)
     model = AutoModelForCausalLM.from_pretrained(model)
     return tokenizer, model
+
+
+def filename_from_atoms(dataset: str, category: str, stage: str, timestamp: T.Optional[str] = None) -> str:
+    """
+    Returns a dataset filename from information like dataset, category, and stage along the chain
+    of qa, qae, qaev, qaeve. Information is underscore delimited. Timestamped to the microsecond.
+
+    Example usage:
+        filename_from_atoms(
+            dataset="mmlu",
+            category="econometrics",
+            "stage"="qae",
+        )
+    """
+    
+    if any("_" in s for s in [dataset, category, stage]):
+        raise ValueError("Don't use underscores in dataset, category, or stage for filename.")
+
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f") if timestamp is None else timestamp
+    return f"{dataset}_{category}_{stage}_{timestamp}.json"
+
+
+def atoms_from_filename(filename: str) -> T.Tuple[str, str, str, str]:
+    """
+    Returns the dataset, category, stage, and timestamp of the filename.
+    """
+
+    path = Path(filename)
+    if path.suffix != ".json":
+        raise ValueError("Must use json file.")
+
+    atoms = path.stem.split("_")
+
+    if len(atoms) != 4:
+        raise ValueError(
+            "Expected 4 atoms in the filename (dataset, category, stage, timestamp),"
+            f"but found {len(atoms)}. Atoms are underscore delimited."
+        )
+
+    return tuple(atoms)
+
+
+def next_filename_in_chain(filename: str) -> str:
+    """
+    Returns the full filename of the next stage of the qa, qae, qaev, qaeve chain.
+
+    Uses the same timestamp as the previous stage to keep same datasets organized.
+    """
+
+    next_stage_dict = {"qa": "qae", "qae": "qaev", "qaev": "qaeve"}
+
+    dataset, category, stage, timestamp = atoms_from_filename(filename)
+
+    if stage not in next_stage_dict:
+        raise ValueError(f"Stage not recognized: {stage}. Known stages are {next_stage_dict.keys()}. Note that qaeve is the final stage and cannot be chained further.")
+
+    next_stage = next_stage_dict[stage]
+
+    return filename_from_atoms(dataset, category, next_stage, timestamp)
+
