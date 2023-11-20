@@ -51,12 +51,18 @@ class Deceiver(DatasetLLM):
         assert "question" in qa
         assert "answer" in qa
 
-        prompt = deceiver_base_config["prompt"].format(
+        explanation_prompt = deceiver_base_config["explanation_prompt"].format(
             Question = qa["question"],
             Answer = qa["answer"],
         )
 
-        qa["explanation"] = self.llm(prompt=prompt)
+        evalaution_prompt = evaluator_base_config["prompt"].format(
+            Question = qa["question"],
+            Answer = qa["answer"],
+        )
+
+        qa["explanation"] = self.llm(prompt=explanation_prompt)
+        qa["evaluation-deceiver"] = self.llm(prompt=evaluation_prompt)
 
         return qa
 
@@ -102,7 +108,7 @@ class Evaluator(DatasetLLM):
             Answer = qa["answer"],
         )
 
-        qa["verdict-without-explanation"] = self.llm(prompt=prompt)
+        qa["evaluation-supervisor"] = self.llm(prompt=prompt)
 
         return qa
 
