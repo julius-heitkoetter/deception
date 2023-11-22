@@ -1,6 +1,7 @@
 import sys
 import os
 import platform
+import time
 
 if platform.system() == "Windows":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "lib"))
@@ -22,6 +23,12 @@ ethics_dataloader = EthicsLoader()
 # us_history_correct, us_history_incorrect = mmlu_dataloader('high_school_us_history', 
 #     data_split='dev', save_locally=True, save_on_hf=False)
 # print(bio_incorrect)
+
+deontology_correct, deontology_incorrect = ethics_dataloader('deontology',
+    data_split='test', save_locally = True, save_on_hf = False, num_samples=10)
+
+print("Sleeping 5s")
+time.sleep(5)
 
 deontology_correct, deontology_incorrect = ethics_dataloader('deontology',
     data_split='test', save_locally = True, save_on_hf = False)
