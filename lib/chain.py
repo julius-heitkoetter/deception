@@ -5,6 +5,7 @@ from config import (
     supervisor_base_config,
     evaluator_base_config,
 )
+import copy
 
 class DataLoader:
     """
@@ -27,6 +28,12 @@ class DatasetLLM(ABC):
 
     def __call__(self, item: T.Dict):
         raise NotImplementedError("")
+    
+    def update_metadata(self, metadata: T.Dict) -> T.Dict:
+        """
+        Update the metadata to describe what is happening during the stage.
+        """
+        raise NotImplementedError("")
 
     def run_on_dataset(self, dataset: T.List[T.Dict]) -> T.List[T.Dict]:
         """
@@ -34,7 +41,11 @@ class DatasetLLM(ABC):
         """
         data = dataset["data"]
         updated_data = [self(item) for item in data]
+
+        updated_metadata = self.update_metadata(dataset["metadata"])
+
         dataset["data"] = updated_data
+        dataset["metadata"] = updated_metadata
 
         return dataset
 
@@ -65,7 +76,23 @@ class Deceiver(DatasetLLM):
         qa["evaluation-deceiver"] = self.llm(prompt=evaluation_prompt)
 
         return qa
+    
+    def update_metadata(self, metadata: T.Dict) -> T.Dict:
+        """
+        Update the metadata to describe what is happening during the stage.
 
+        Specifically, we want to mension the deceiver llm, the explanation
+        prompt, and the deceiver evaluation prompt
+        """
+
+        # create deep copy as to not mutate inputs
+        updated_metadata = copy.deepcopy(metadata)
+
+        updated_metadata["deceiver_llm"] = self.llm.name
+        updated_metadata["explanation_prompt"] = deceiver_base_config["explanation_prompt"]
+        updated_metadata["deciever_evalaution_prompt"] = evaluator_base_config["prompt"]
+
+        return updated_metadata
 
 class Supervisor(DatasetLLM):
     """
@@ -89,6 +116,22 @@ class Supervisor(DatasetLLM):
         qae["verdict"] = self.llm(prompt=prompt)
 
         return qae
+    
+    def update_metadata(self, metadata: T.Dict) -> T.Dict:
+        """
+        Update the metadata to describe what is happening during the stage.
+
+        Specifically, we want to mension the supervisor llm and verdict prompt,
+
+        """
+
+        # create deep copy as to not mutate inputs
+        updated_metadata = copy.deepcopy(metadata)
+
+        updated_metadata["supervisor_llm"] = self.llm.name
+        updated_metadata["verdict_prompt"] = supervisor_base_config["prompt"]
+
+        return updated_metadata
 
 
 class Evaluator(DatasetLLM):
@@ -111,5 +154,21 @@ class Evaluator(DatasetLLM):
         qa["evaluation-supervisor"] = self.llm(prompt=prompt)
 
         return qa
+    
+    def update_metadata(self, metadata: T.Dict) -> T.Dict:
+        """
+        Update the metadata to describe what is happening during the stage.
+
+        Specifically, we want to mension the evaluator llm and evaluator prompt,
+
+        """
+
+        # create deep copy as to not mutate inputs
+        updated_metadata = copy.deepcopy(metadata)
+
+        updated_metadata["evaluator_llm"] = self.llm.name
+        updated_metadata["evaluator_prompt"] = evaluator_base_config["prompt"]
+
+        return updated_metadata
 
 
