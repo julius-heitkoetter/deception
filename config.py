@@ -99,7 +99,7 @@ CoT_base_config = {
 ###############################################
 
 deceiver_base_config = {
-    "prompt": deceiver_base_prompt,
+    "explanation_prompt": deceiver_base_prompt,
     # Other things?
 }
 
