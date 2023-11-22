@@ -83,6 +83,12 @@ class DataLoader(ABC):
                 repo_type="dataset")
         return full_storage_path
         
+    def dataset_to_json(self, category, split, extractor):
+        json_dict_correct = self.new_json(category=category, correct=True)
+        json_dict_incorrect = self.new_json(category=category, correct=False)
+        for question_data in load_dataset(self.hf_dataset_src_path, category, split=split):
+            extractor(question_data, json_dict_correct, json_dict_incorrect)
+        return json_dict_correct, json_dict_incorrect
 
 
 class MMLULoader(DataLoader):
@@ -116,35 +122,29 @@ class MMLULoader(DataLoader):
         assert category in MMLU_CATEGORIES, f"category: {category} not in MMLU categories"
         assert data_split in MMLU_DATA_SPLITS, f"data split: {data_split} not in MMLU data splits"
 
-        json_correct, json_incorrect = self._mmlu_to_json(category, data_split)
+        json_correct, json_incorrect = self.dataset_to_json(category, split=data_split, extractor=self.mmlu_extractor) #self._mmlu_to_json(category, data_split)
 
+        # TODO: make upload_file to take in arbitrary number of jsons
         correct_path = self.upload_file(json_correct, save_locally=save_locally, save_on_hf=save_on_hf)
         incorrect_path = self.upload_file(json_incorrect, save_locally=save_locally, save_on_hf=save_on_hf)
 
         return correct_path, incorrect_path
 
-    def _mmlu_to_json(self, category, split):
+    def mmlu_extractor(self, question_data, json_dict_correct, json_dict_incorrect):
         """
-        Converts desired category to json format by loading from hugging face
-        Organizes into correct and incorrect responses
+        Extracts data from MMLU dataset and stores it in json format
         """
-        json_dict_correct = self.new_json(category=category, correct=True)
-        json_dict_incorrect = self.new_json(category=category, correct=False)
-        
-        for question_data in load_dataset(self.hf_dataset_src_path, category, split=split):
-            for i, answer in enumerate(question_data['choices']):
-                is_correct = i == question_data['answer'] # True if answer choice is correct, else False
-                new_question = [{
-                    'question': question_data['question'],
-                    'answer': answer,
-                    'correct': is_correct
-                }]
-                if is_correct:
-                    json_dict_correct['data'].append(new_question)
-                else:
-                    json_dict_incorrect['data'].append(new_question)
-
-        return json_dict_correct, json_dict_incorrect 
+        for i, answer in enumerate(question_data['choices']):
+            is_correct = i == question_data['answer'] # True if answer choice is correct, else False
+            new_question = [{
+                'question': question_data['question'],
+                'answer': answer,
+                'correct': is_correct
+            }]
+            if is_correct:
+                json_dict_correct['data'].append(new_question)
+            else:
+                json_dict_incorrect['data'].append(new_question)
 
 class EthicsLoader(DataLoader):
     def __init__(self, storage_path:str = ""):
@@ -182,19 +182,12 @@ class EthicsLoader(DataLoader):
         assert category in ETHICS_CATEGORIES
         assert data_split in ETHICS_DATA_SPLITS, f"data split: {data_split} not in Ethics data splits"
 
-        json_correct, json_incorrect = self._ethics_to_json(category, data_split)
+        json_correct, json_incorrect = self.dataset_to_json(category, split=data_split, extractor=self.ethics_data_extractors[category]) # self._ethics_to_json(category, data_split)
 
         correct_path = self.upload_file(json_correct, save_locally=save_locally, save_on_hf=save_on_hf)
         incorrect_path = self.upload_file(json_incorrect, save_locally=save_locally, save_on_hf=save_on_hf)
 
         return correct_path, incorrect_path
-
-    def _ethics_to_json(self, category, split):
-        json_dict_correct = self.new_json(category=category, correct=True)
-        json_dict_incorrect = self.new_json(category=category, correct=False)
-        for question_data in load_dataset(self.hf_dataset_src_path, category, split=split):
-            self.ethics_data_extractors[category](question_data, json_dict_correct, json_dict_incorrect)
-        return json_dict_correct, json_dict_incorrect
 
     def generic_data_extractor(self, question_data, json_dict_correct, json_dict_incorrect, flipped_label: bool):
         correct_label = int(flipped_label)
