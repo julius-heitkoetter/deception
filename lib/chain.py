@@ -67,7 +67,7 @@ class Deceiver(DatasetLLM):
             Answer = qa["answer"],
         )
 
-        evalaution_prompt = evaluator_base_config["prompt"].format(
+        evaluation_prompt = evaluator_base_config["prompt"].format(
             Question = qa["question"],
             Answer = qa["answer"],
         )
