@@ -124,11 +124,13 @@ class MMLULoader(DataLoader):
 
         if num_samples is not None:
 
-            data_correct = np.random.shuffle(json_correct['data'])[:num_samples]
-            json_correct = {'metadata': json_correct['metadata'], 'data':data_correct}
+            data_correct = json_correct['data']
+            np.random.shuffle(data_correct)
+            json_correct = {'metadata': json_correct['metadata'], 'data':data_correct[:num_samples]}
 
-            data_incorrect = np.random.shuffle(json_incorrect['data'])[:num_samples]
-            json_incorrect = {'metadata': json_incorrect['metadata'], 'data':data_incorrect}
+            data_incorrect = json_incorrect['data']
+            np.random.shuffle(data_incorrect)
+            json_incorrect = {'metadata': json_incorrect['metadata'], 'data':data_incorrect[:num_samples]}
 
         correct_path = self.upload_file(json_correct, save_locally=save_locally, save_on_hf=save_on_hf)
         incorrect_path = self.upload_file(json_incorrect, save_locally=save_locally, save_on_hf=save_on_hf)
@@ -201,11 +203,13 @@ class EthicsLoader(DataLoader):
 
         if num_samples is not None:
 
-            data_correct = np.random.shuffle(json_correct['data'])[:num_samples]
-            json_correct = {'metadata': json_correct['metadata'], 'data':data_correct}
+            data_correct = json_correct['data']
+            np.random.shuffle(data_correct)
+            json_correct = {'metadata': json_correct['metadata'], 'data':data_correct[:num_samples]}
 
-            data_incorrect = np.random.shuffle(json_incorrect['data'])[:num_samples]
-            json_incorrect = {'metadata': json_incorrect['metadata'], 'data':data_incorrect}
+            data_incorrect = json_incorrect['data']
+            np.random.shuffle(data_incorrect)
+            json_incorrect = {'metadata': json_incorrect['metadata'], 'data':data_incorrect[:num_samples]}
 
         correct_path = self.upload_file(json_correct, save_locally=save_locally, save_on_hf=save_on_hf)
         incorrect_path = self.upload_file(json_incorrect, save_locally=save_locally, save_on_hf=save_on_hf)
