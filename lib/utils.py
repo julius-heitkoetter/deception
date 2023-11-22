@@ -106,10 +106,16 @@ def download_pretrained_model_from_hf(model: str) -> T.Tuple[T.Any, T.Any]:
     return tokenizer, model
 
 
-def filename_from_atoms(dataset: str, category: str, stage: str, timestamp: T.Optional[str] = None) -> str:
+def filename_from_atoms(
+        dataset: str, category: str, stage: str, deciever_model: T.Optional[str] = "anyModel", 
+        supervisor_model: T.Optional[str] = "anyModel", timestamp: T.Optional[str] = None
+        )-> str:
     """
     Returns a dataset filename from information like dataset, category, and stage along the chain
     of qa, qae, qaev, qaeve. Information is underscore delimited. Timestamped to the microsecond.
+
+    Additionally, if deciever model or supervisor model are yet to be specified, it is considered
+    to be "anyModel". 
 
     Example usage:
         filename_from_atoms(
@@ -119,16 +125,22 @@ def filename_from_atoms(dataset: str, category: str, stage: str, timestamp: T.Op
         )
     """
     
-    if any("_" in s for s in [dataset, category, stage]):
+    if any("_" in s for s in [dataset, category, stage, deciever_model, supervisor_model]):
         raise ValueError("Don't use underscores in dataset, category, or stage for filename.")
+    
+    if deciever_model=="anyModel" and (stage=="qae" or stage == "qaev" or stage == "qaeve"):
+        raise ValueError("qae, qaev, and qaeve datasets must specify 'deciever_model'")
+    
+    if supervisor_model=="anyModel" and (stage == "qaev" or stage == "qaeve"):
+        raise ValueError("qaev and qaeve datasets must specify 'supervisor_model'")
 
     timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f") if timestamp is None else timestamp
-    return f"{dataset}_{category}_{stage}_{timestamp}.json"
+    return f"{dataset}_{category}_{stage}_{deciever_model}_{supervisor_model}_{timestamp}.json"
 
 
-def atoms_from_filename(filename: str) -> T.Tuple[str, str, str, str]:
+def atoms_from_filename(filename: str) -> T.Tuple[str, str, str, str, str, str]:
     """
-    Returns the dataset, category, stage, and timestamp of the filename.
+    Returns the dataset, category, stage, deciever model, supervisor model, and timestamp of the filename.
     """
 
     path = Path(filename)
@@ -137,16 +149,16 @@ def atoms_from_filename(filename: str) -> T.Tuple[str, str, str, str]:
 
     atoms = path.stem.split("_")
 
-    if len(atoms) != 4:
+    if len(atoms) != 6:
         raise ValueError(
-            "Expected 4 atoms in the filename (dataset, category, stage, timestamp),"
+            "Expected 6 atoms in the filename (dataset, category, stage, deciever model, supervisor model, timestamp),"
             f"but found {len(atoms)}. Atoms are underscore delimited."
         )
 
     return tuple(atoms)
 
 
-def next_filename_in_chain(filename: str) -> str:
+def next_filename_in_chain(filename: str, deciever_model: T.Optional[str] = None, supervisor_model: T.Optional[str] = None) -> str:
     """
     Returns the full filename of the next stage of the qa, qae, qaev, qaeve chain.
 
@@ -155,12 +167,29 @@ def next_filename_in_chain(filename: str) -> str:
 
     next_stage_dict = {"qa": "qae", "qae": "qaev", "qaev": "qaeve"}
 
-    dataset, category, stage, timestamp = atoms_from_filename(filename)
+    # In states qae and qaev, we overwrite the model name with the model name that was passed into the function
+    # In all other cases, we grab the same model used at before
+    # If we're at a model that hasn't been specified, it should be named 'anyModel'.
+    stage = atoms_from_filename(filename)[2]
+    if stage == "qa":
+        dataset, category, stage, _, supervisor_model_name, timestamp = atoms_from_filename(filename)
+        if deciever_model is None:
+            raise ValueError("Deciever model must be specified when going from qa to qae")
+        deceiver_model_name = deciever_model
+    elif stage == "qae":
+        dataset, category, stage, deceiver_model_name, _, timestamp = atoms_from_filename(filename)
+        if supervisor_model is None:
+            raise ValueError("Supervisor model must be specified when going from qae to qaev")
+        supervisor_model_name = supervisor_model
+    else:
+        dataset, category, stage, deceiver_model_name, supervisor_model_name, timestamp = atoms_from_filename(filename)
+
+    
 
     if stage not in next_stage_dict:
         raise ValueError(f"Stage not recognized: {stage}. Known stages are {next_stage_dict.keys()}. Note that qaeve is the final stage and cannot be chained further.")
 
     next_stage = next_stage_dict[stage]
 
-    return filename_from_atoms(dataset, category, next_stage, timestamp)
+    return filename_from_atoms(dataset, category, next_stage, deceiver_model_name, supervisor_model_name, timestamp)
 
