@@ -7,9 +7,9 @@ from lib.models import OpenAILLM, LlamaLLM
 from config import gpt_35_turbo_base_config, llama_base_config, llama_70b_base_config
 from lib.chain import Supervisor, Deceiver, Evaluator
 from lib.utils import save_json_locally, get_json_locally, upload_json_to_hf
-from lib.dataset import MMLULoader, EthicsLoaders
+from lib.dataset import MMLULoader, EthicsLoader
 
-def run_pipline_on_dataset(
+def run_pipeline_on_dataset(
         dataset_name,             # Must either be 'mmlu' or 'ethics'
         category,                 # Must be in the categories of the respective dataset
     save_location,            # Must be either 'local' or 'hf'
@@ -19,6 +19,8 @@ def run_pipline_on_dataset(
         supervisor_config_name,   # Must be in the keys to CONFIG_MAPPING
         num_samples = None,       # Optional integer argument, containing the number of samples
     ):
+
+    print("HERE")
 
     MODEL_MAPPING = {
         "OpenAILLM":OpenAILLM, 
@@ -91,14 +93,13 @@ def run_pipline_on_dataset(
     qaeve_correct_dataset_path = evaluator.run_on_dataset_name(qaev_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
     print("INFO: Finished qaeve correct dataset generation. File at:", save_location, ":", qaeve_correct_dataset_path) 
 
-if __name__ == 'main':
-    run_pipeline_on_dataset(
+run_pipeline_on_dataset(
         'mmlu',
-        'biology',
+        'anatomy',
         'hf',
         'OpenAILLM',
         'gpt_35_turbo_base_config',
         'OpenAILLM',
         'gpt_35_turbo_base_config',
         5,    
-    )
+)
