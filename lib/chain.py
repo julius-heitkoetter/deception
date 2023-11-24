@@ -93,6 +93,9 @@ class DatasetLLM(ABC):
         elif save_on_hf:
             upload_json_to_hf(dataset, os.path.join(storage_path, out_filename), repo_id, "dataset")
 
+        # return the path of the output dataset
+        return os.path.join(storage_path, out_filename)
+
     def get_next_filename_in_chain(filename):
         raise NotImplementedError("")
 
@@ -140,7 +143,7 @@ class Deceiver(DatasetLLM):
 
         return updated_metadata
 
-    def get_next_filename_in_chain(filename):
+    def get_next_filename_in_chain(self, filename):
         """
         Deceiver class specific wrapper for the util next_filename_in_chain
         """
@@ -185,7 +188,7 @@ class Supervisor(DatasetLLM):
 
         return updated_metadata
 
-    def get_next_filename_in_chain(filename):
+    def get_next_filename_in_chain(self, filename):
         """
         Supervisor class specific wrapper for the util next_filename_in_chain
         """
@@ -230,7 +233,7 @@ class Evaluator(DatasetLLM):
 
         return updated_metadata
 
-    def get_next_filename_in_chain(filename):
+    def get_next_filename_in_chain(self, filename):
         """
         Evaluator class specific wrapper for the util next_filename_in_chain
         """
