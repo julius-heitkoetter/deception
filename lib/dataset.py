@@ -8,6 +8,7 @@ import typing as T
 import json
 from abc import ABC
 from datasets import load_dataset
+import numpy as np
 
 
 if platform.system() == "Windows":
@@ -96,7 +97,8 @@ class MMLULoader(DataLoader):
 
         )
 
-    def __call__(self, category: str, data_split: str ='dev', save_locally: bool = False, save_on_hf: bool = True):
+    def __call__(self, category: str, data_split: str ='dev', save_locally: bool = False, 
+                 save_on_hf: bool = True, num_samples: T.Optional[int] = None):
         """
         Returns json files of correct (and incorrect) responses.
         json structure: {
@@ -108,6 +110,8 @@ class MMLULoader(DataLoader):
             category (str) the MMLU category (e.g. "astronomy", "high_school_us_history")
             data_split (str) which split from hugging face to download
                 - must be in {'auxiliary_train', 'test', 'validation', 'dev'}
+            num_samples (int) how many samples to use. Samples are always shuffled. All 
+                              samples used if this is None
 
         Outupts:
             (tuple[str]) path/filenames to json files 
@@ -117,9 +121,19 @@ class MMLULoader(DataLoader):
 
         json_correct, json_incorrect = self._mmlu_to_json(category, data_split)
 
+        if num_samples is not None:
+
+            data_correct = json_correct['data']
+            np.random.shuffle(data_correct)
+            json_correct = {'metadata': json_correct['metadata'], 'data':data_correct[:num_samples]}
+
+            data_incorrect = json_incorrect['data']
+            np.random.shuffle(data_incorrect)
+            json_incorrect = {'metadata': json_incorrect['metadata'], 'data':data_incorrect[:num_samples]}
+
         correct_path = self.upload_file(json_correct, category, save_locally=save_locally, save_on_hf=save_on_hf)
         incorrect_path = self.upload_file(json_incorrect, category, save_locally=save_locally, save_on_hf=save_on_hf)
-
+        
         return correct_path, incorrect_path
 
     def _mmlu_to_json(self, category, split):
@@ -161,7 +175,8 @@ class EthicsLoader(DataLoader):
             'virtue': self.virtue_data_extractor 
         }
 
-    def __call__(self, category, data_split='test', save_locally: bool = False, save_on_hf: bool = True):
+    def __call__(self, category, data_split='test', save_locally: bool = False, save_on_hf: bool = True, 
+                 num_samples: T.Optional[int] = None):
         """
         Returns json files of correct (and incorrect) responses.
         json structure: {
@@ -173,6 +188,8 @@ class EthicsLoader(DataLoader):
             category (str) the Ethics category (e.g. "astronomy", "high_school_us_history")
             data_split (str) which split from hugging face to download
                 - must be in {'auxiliary_train', 'test', 'validation', 'dev'}
+            num_samples (int) how many samples to use. Samples are always shuffled. All 
+                              samples used if this is None
 
         Outupts:
             (tuple[str]) path/filenames to json files 
@@ -182,6 +199,16 @@ class EthicsLoader(DataLoader):
         assert data_split in ETHICS_DATA_SPLITS, f"data split: {data_split} not in Ethics data splits"
 
         json_correct, json_incorrect = self._ethics_to_json(category, data_split)
+
+        if num_samples is not None:
+
+            data_correct = json_correct['data']
+            np.random.shuffle(data_correct)
+            json_correct = {'metadata': json_correct['metadata'], 'data':data_correct[:num_samples]}
+
+            data_incorrect = json_incorrect['data']
+            np.random.shuffle(data_incorrect)
+            json_incorrect = {'metadata': json_incorrect['metadata'], 'data':data_incorrect[:num_samples]}
 
         correct_path = self.upload_file(json_correct, category, save_locally=save_locally, save_on_hf=save_on_hf)
         incorrect_path = self.upload_file(json_incorrect, category, save_locally=save_locally, save_on_hf=save_on_hf)
