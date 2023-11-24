@@ -90,7 +90,7 @@ class Deceiver(DatasetLLM):
 
         updated_metadata["deceiver_llm"] = self.llm.name
         updated_metadata["explanation_prompt"] = deceiver_base_config["explanation_prompt"]
-        updated_metadata["deciever_evalaution_prompt"] = evaluator_base_config["prompt"]
+        updated_metadata["deciever_evaluation_prompt"] = evaluator_base_config["prompt"]
 
         return updated_metadata
 
