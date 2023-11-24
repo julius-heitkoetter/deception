@@ -5,6 +5,7 @@ from config import (
     supervisor_base_config,
     evaluator_base_config,
 )
+from lib.utils import atoms_from_filename, next_filename_in_chain
 import copy
 
 class DataLoader:
@@ -49,6 +50,43 @@ class DatasetLLM(ABC):
 
         return dataset
 
+    def run_on_dataset_name(self, dataset_path: str, save_locally: bool = False, save_on_hf: bool = True,
+                            repo_id: str = "laker-julius-misha/correlated-errors") -> str:
+        """
+        Run on an entire datset to add the relevant key-value pair to each item in the list.
+
+        This method takes in a full filepath, fetches that file either locally or from hf, runs on the
+        dataset, then writes the new file back to either local storage or to hf
+        """        
+        
+        # get filename and path 
+        filename = os.path.basename(dataset_path)
+        storage_path = os.path.dirname(dataset_path)
+
+        # check if either uploaded locally or on huggingface (but not both!)
+        if not (save_locally or save_on_hf):
+            raise ValueError("Either save_locally or save_on_hf flags must be set to true")
+        if save_locally and save_on_hf:
+            raise ValueError("Cannot get dataset from both local storage and hugging face simultaneously")        
+
+        # get dataset
+        if save_locally:
+            dataset = get_json_locally(storage_path, filename)
+        elif save_on_hf:
+            dataset = download_json_dataset_from_hf(os.path.join(storage_path, filename), repo_id)
+
+        # modify the dataset
+        dataset = self.run_on_dataset(dataset)
+        out_filename = self.get_next_filename_in_chain(filename)
+
+        # save the dataset
+        if save_locally:
+            save_json_locally(storage_path, out_filename, dataset)
+        elif save_on_hf:
+            upload_json_to_hf(dataset, os.path.join(storage_path, out_filename), repo_id, "dataset")
+
+    def get_next_filename_in_chain(filename):
+        raise NotImplementedError("")
 
 class Deceiver(DatasetLLM):
     """
@@ -94,6 +132,12 @@ class Deceiver(DatasetLLM):
 
         return updated_metadata
 
+    def get_next_filename_in_chain(filename):
+        """
+        Deceiver class specific wrapper for the util next_filename_in_chain
+        """
+        return next_filename_in_chain(filename, deciever_model = self.llm.name)
+
 class Supervisor(DatasetLLM):
     """
     qae -> qaev
@@ -133,6 +177,13 @@ class Supervisor(DatasetLLM):
 
         return updated_metadata
 
+    def get_next_filename_in_chain(filename):
+        """
+        Supervisor class specific wrapper for the util next_filename_in_chain
+        """
+        _, _, _, deciever_model, _, _ = atoms_from_filename(filename)
+        return next_filename_in_chain(filename, deciever_model = deciever_model, supervisor_model = self.llm.name)
+
 
 class Evaluator(DatasetLLM):
     """
@@ -171,4 +222,10 @@ class Evaluator(DatasetLLM):
 
         return updated_metadata
 
+    def get_next_filename_in_chain(filename):
+        """
+        Evaluator class specific wrapper for the util next_filename_in_chain
+        """
 
+        _, _, _, deciever_model, supervisor_model, _ = atoms_from_filename(filename)
+        return next_filename_in_chain(filename, deciever_model = deciever_model, supervisor_model = supervisor_model)
