@@ -81,7 +81,7 @@ class Deceiver(DatasetLLM):
         """
         Update the metadata to describe what is happening during the stage.
 
-        Specifically, we want to mension the deceiver llm, the explanation
+        Specifically, we want to mention the deceiver llm, the explanation
         prompt, and the deceiver evaluation prompt
         """
 
@@ -121,7 +121,7 @@ class Supervisor(DatasetLLM):
         """
         Update the metadata to describe what is happening during the stage.
 
-        Specifically, we want to mension the supervisor llm and verdict prompt,
+        Specifically, we want to mention the supervisor llm and verdict prompt,
 
         """
 
@@ -159,7 +159,7 @@ class Evaluator(DatasetLLM):
         """
         Update the metadata to describe what is happening during the stage.
 
-        Specifically, we want to mension the evaluator llm and evaluator prompt,
+        Specifically, we want to mention the evaluator llm and evaluator prompt,
 
         """
 
