@@ -147,11 +147,11 @@ class MMLULoader(DataLoader):
         for question_data in load_dataset(self.hf_dataset_src_path, category, split=split):
             for i, answer in enumerate(question_data['choices']):
                 is_correct = i == question_data['answer'] # True if answer choice is correct, else False
-                new_question = [{
+                new_question = {
                     'question': question_data['question'],
                     'answer': answer,
                     'correct': is_correct
-                }]
+                }
                 if is_correct:
                     json_dict_correct['data'].append(new_question)
                 else:
