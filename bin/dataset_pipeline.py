@@ -20,8 +20,6 @@ def run_pipeline_on_dataset(
         num_samples = None,       # Optional integer argument, containing the number of samples
     ):
 
-    print("HERE")
-
     MODEL_MAPPING = {
         "OpenAILLM":OpenAILLM, 
         "LlamaLLM": LlamaLLM
@@ -69,14 +67,17 @@ def run_pipeline_on_dataset(
         assert ValueError("dataset_name must either be 'mmlu' or 'ethics'")
     
     # create qa datasets
-    qa_correct_dataset_path, qa_incorrect_dataset_path = dataloader(category, save_locally=save_locally, save_on_hf=save_on_hf)
-
+    print("INFO: Starting qa dataset generation")
+    qa_correct_dataset_path, qa_incorrect_dataset_path = dataloader(category, save_locally=save_locally, save_on_hf=save_on_hf, num_samples=num_samples)
+    print("INFO: Finsihed qa correct dataset generation. File at:", save_location, ":", qa_correct_dataset_path)
+    print("INFO: Finished qa incorrect dataset generation, File at:", save_location, ":", qa_incorrect_dataset_path)
+    
     # process through the incorrect dataset (main work is done below)
     print("INFO: Starting qae incorrect dataset generation")
     qae_incorrect_dataset_path = deceiver.run_on_dataset_name(qa_incorrect_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
     print("INFO: Finished qae incorrect dataset generation. File at:", save_location, ":", qae_incorrect_dataset_path)
     print("INFO: Starting qaev incorrect dataset generation")
-    qaev_incorrect_dataset_path = supervisor.run_on_datset_name(qae_incorrect_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
+    qaev_incorrect_dataset_path = supervisor.run_on_dataset_name(qae_incorrect_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
     print("INFO: Finished qaev incorrect dataset generation. File at:", save_location, ":", qaev_incorrect_dataset_path)
     print("INFO: Starting qaeve incorrect dataset generation")
     qaeve_incorrect_dataset_path = evaluator.run_on_dataset_name(qaev_incorrect_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
@@ -87,7 +88,7 @@ def run_pipeline_on_dataset(
     qae_correct_dataset_path = deceiver.run_on_dataset_name(qa_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
     print("INFO: Finished qae correct dataset generation. File at:", save_location, ":", qae_correct_dataset_path)
     print("INFO: Starting qaev correct dataset generation")
-    qaev_correct_dataset_path = supervisor.run_on_datset_name(qae_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
+    qaev_correct_dataset_path = supervisor.run_on_dataset_name(qae_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
     print("INFO: Finished qaev correct dataset generation. File at:", save_location, ":", qaev_correct_dataset_path)
     print("INFO: Starting qaeve correct dataset generation")
     qaeve_correct_dataset_path = evaluator.run_on_dataset_name(qaev_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
@@ -95,11 +96,11 @@ def run_pipeline_on_dataset(
 
 run_pipeline_on_dataset(
         'mmlu',
-        'anatomy',
+        'econometrics',
         'hf',
         'OpenAILLM',
         'gpt_35_turbo_base_config',
         'OpenAILLM',
         'gpt_35_turbo_base_config',
-        5,    
+        10,    
 )
