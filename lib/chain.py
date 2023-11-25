@@ -15,6 +15,7 @@ from lib.utils import (
 )
 import copy
 import os
+from tqdm import tqdm
 
 class DataLoader:
     """
@@ -49,7 +50,9 @@ class DatasetLLM(ABC):
         Run an on an entire dataset to add the relevant key-value pair to each item in the list. Mutates dataset.
         """
         data = dataset["data"]
-        updated_data = [self(item) for item in data]
+        updated_data = []
+        for i in tqdm(range(len(data)), desc = "Running..."):
+            updated_data.append(self(data[i]))
 
         updated_metadata = self.update_metadata(dataset["metadata"])
 
