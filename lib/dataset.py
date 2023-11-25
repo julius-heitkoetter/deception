@@ -69,7 +69,6 @@ class DataLoader(ABC):
     
     def upload_file(self, data: dict, category: str, save_locally: bool = False, save_on_hf: bool = False):
         correct_incorrect = "correct" if data['metadata']['correct'] else "incorrect"
-        category = data['metadata']['category']
         file_name = filename_from_atoms(self.dataset_name, category, "qa")
         full_storage_path = f"{self.final_storage_path}/{file_name}"
 
@@ -116,7 +115,7 @@ class MMLULoader(DataLoader):
         Outupts:
             (tuple[str]) path/filenames to json files 
         """
-        assert category in MMLU_CATEGORIES, f"category: {category} not in MMLU categories"
+        assert category in MMLU_CATEGORIES, f"category: {category} not in MMLU categories."
         assert data_split in MMLU_DATA_SPLITS, f"data split: {data_split} not in MMLU data splits"
 
         json_correct, json_incorrect = self._mmlu_to_json(category, data_split)
@@ -130,6 +129,9 @@ class MMLULoader(DataLoader):
             data_incorrect = json_incorrect['data']
             np.random.shuffle(data_incorrect)
             json_incorrect = {'metadata': json_incorrect['metadata'], 'data':data_incorrect[:num_samples]}
+
+        # replace all underscores with hyphens in the category for the proper naming
+        category = category.replace("_", "-")
 
         correct_path = self.upload_file(json_correct, category, save_locally=save_locally, save_on_hf=save_on_hf)
         incorrect_path = self.upload_file(json_incorrect, category, save_locally=save_locally, save_on_hf=save_on_hf)
