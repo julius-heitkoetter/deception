@@ -106,7 +106,6 @@ class OpenAILLM():
         stop: Optional[List[str]] = None,
     ) -> str:
         
-        print("asking")
         
         system_intel = "You are OpenAI's GPT model, answer my questions as correctly as you can."
 
