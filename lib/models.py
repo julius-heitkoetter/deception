@@ -7,7 +7,7 @@ import itertools
 
 class ToT():
     """
-    Creates a ToT wrapper around an LLM. 
+    Creates a tree of thoughts (ToT) wrapper around an LLM. 
 
     Is called exactly like an LLM, just executes a chain of thought to get answer.
 
@@ -41,7 +41,7 @@ class ToT():
 
     def get_samples(self, problem, previous_CoT):
         """
-        Takes an input problem, x, and an existing chain of thought, y, 
+        Takes an input problem, 'problem', and an existing chain of thought, 'previous_CoT', 
         and outputs a continued/enchanced chain of thought.
 
         Note that y may simply be an empty string, especially if this is
@@ -56,10 +56,10 @@ class ToT():
             samples.append(self.llm(prompt = prompt))
         return samples
 
-    def get_score(self, problem, CoT):
+    def get_score(self, problem, current_CoT):
         """
-        Takes as input a problem, x, and a chain of thought about that
-        problem, y, and returns an integer to rate how likely the chain
+        Takes as input a problem, 'problem', and a chain of thought about that
+        problem, 'current_CoT', and returns an integer to rate how likely the chain
         of thought is able to solve the problem.
 
         1 means that the thougths on correctness are fundamentally incorrect, 
@@ -73,7 +73,7 @@ class ToT():
         while score is None and num_tries < self.max_num_tries:
 
             prompt = self.get_scores_prompt.format(
-                        CoT = CoT,
+                        CoT = current_CoT,
             )
             potential_score = self.llm(prompt=prompt)
 
@@ -93,23 +93,23 @@ class ToT():
 
         return score
     
-    def get_final_answer(self, problem, CoT):
+    def get_final_answer(self, problem, current_CoT):
         """
-        Takes as input a problem, x, and a chain of thought, y, and returns
-        an answer to the problem, stripped of all the chains of thought.
+        Takes as input a problem, 'problem', and a chain of thought, 'current_CoT', 
+        and returns an answer to the problem, stripped of all the chains of thought.
         """
         
         prompt = self.get_answer_prompt.format(
             Problem = problem,
-            CoT = CoT,
+            CoT = current_CoT,
         )
 
         return self.llm(prompt = prompt)
 
-    def get_final_bool_answer(self, problem, CoT):
+    def get_final_bool_answer(self, problem, current_CoT):
         """
-        Takes as input a problem, x, and a chain of thought, y, and returns
-        an answer to the problem, stripped of all the chains of thought.
+        Takes as input a problem, 'problem', and a chain of thought, 'current_CoT', 
+        and returns an answer to the problem, stripped of all the chains of thought.
 
         Note that this method forces the output to be a string representing
         a boolean. If after max_num_tries this is not the case, this method
@@ -121,7 +121,7 @@ class ToT():
         while answer is None and num_tries < self.max_num_tries:
             prompt = self.get_answer_prompt.format(
                 Problem = problem,
-                CoT = CoT,
+                CoT = current_CoT,
             )
             potential_answer = self.llm(prompt=prompt)
             
@@ -219,7 +219,7 @@ class ToT():
             # weighted samples from all possible options to get N=num_select_sample choices.
             ps = np.array(values) / sum(values)
             select_ids = np.random.choice(ids, size=1, p=ps).tolist()
-        final_CoT = [ys[select_id] for select_id in select_ids][0]
+        final_CoT = ys[select_ids[0]]
 
         #extract the final answer from the last chain of thought
         if self.return_boolean:
