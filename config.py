@@ -44,7 +44,7 @@ evaluator_base_prompt = """ Write some prompt here
 """
 
 CoT_base_get_samples_prompt = """
-    You are an chain of thought AI. Below, you see a problem which an AI has been asked to solve, and you will use chain of thought to solve it. 
+    You are a chain of thought AI. Below, you see a problem which an AI has been asked to solve, and you will use chain of thought to solve it. 
 
     Output a chain of thought which slowly and carefully solves the problem. You may be given some "previous thoughts on problem" to help you, which you should elaborate on. You do not need to fully solve the problem but instead continue to evolve the chain of thought. 
 
@@ -57,10 +57,10 @@ CoT_base_get_samples_prompt = """
     CHAIN OF THOUGHT:
 """
 
-CoT_base_get_score_prompt = """
+CoT_base_get_scores_prompt = """
     Below you see  some "thoughts on correctness". The "thoughts on correctness" are thoughts to back up a solution to a problem.
 
-	Rate the "thoughts on correctness" from 1-10. Where 1 means that the thougths on correctness are fundamentally incorrect, 5 means that the thoughts on correctness are correct but do not reach a conclusion and 10 means the thoughts on correctness reach a solid conclusion.
+    Rate the "thoughts on correctness" from 1-10. Where 1 means that the thoughts on correctness are fundamentally incorrect, 5 means that the thoughts on correctness are correct but do not reach a conclusion and 10 means the thoughts on correctness reach a solid conclusion.
 
 	Only output a single integer (1-10).
 
@@ -125,7 +125,7 @@ gpt_35_turbo_base_config = {
 
 ToT_base_config = {
     "get_samples_prompt": CoT_base_get_samples_prompt,
-    "get_scores_prompt": CoT_base_get_score_prompt,
+    "get_scores_prompt": CoT_base_get_scores_prompt,
     "get_answer_prompt": CoT_base_get_answer_prompt,
 }
 
