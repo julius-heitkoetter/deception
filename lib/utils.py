@@ -193,3 +193,32 @@ def next_filename_in_chain(filename: str, deciever_model: T.Optional[str] = None
 
     return filename_from_atoms(dataset, category, next_stage, deceiver_model_name, supervisor_model_name, timestamp)
 
+# The helper functions below form an interface to extract information out of dataset items.
+
+def str_to_bool(string: str) -> bool:
+    if type(string) == bool:
+        return string
+    # remove non-alphabetic characters, such as spaces and numbers
+    cleaned_string = "".join(char for char in string if char.isalpha())
+    return cleaned_string == "true"
+
+def get_question(item: dict) -> str:
+    return item["question"]
+
+def get_answer(item: dict) -> str:
+    return item["answer"]
+
+def get_explanation(item: dict) -> str:
+    return item["explanation"]
+
+def get_correct(item: dict) -> bool:
+    return str_to_bool(item["correct"])
+
+def get_verdict(item: dict) -> bool:
+    return str_to_bool(item["verdict"])
+
+def get_deceiver_evaluation(item: dict) -> bool:
+    return str_to_bool(item["evaluation-deceiver"])
+
+def get_supervisor_evaluation(item: dict) -> bool:
+    return str_to_bool(item["evaluation-supervisor"])
