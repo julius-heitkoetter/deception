@@ -375,7 +375,7 @@ class OpenAILLM():
         
         system_intel = "You are OpenAI's GPT model, answer my questions as correctly as you can."
 
-        result = openai.ChatCompletion.create(model="gpt-4",
+        result = openai.ChatCompletion.create(model=self.model_name,
                                  messages=[{"role": "system", "content": system_intel},
                                            {"role": "user", "content": prompt}])
         
