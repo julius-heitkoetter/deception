@@ -1,6 +1,7 @@
 import torch
 import openai
 from typing import Any, Callable, List, Optional
+import os
 
 class CoT():
     """
@@ -39,7 +40,7 @@ class LlamaLLM():
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        self.name = "llama"
+        self.name = os.path.basename(self.base_model)
 
         #Packages needed
         from peft import PeftModel
