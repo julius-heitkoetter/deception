@@ -2,9 +2,10 @@ import json
 import sys
 import os
 import platform
+import argparse
 
-from lib.models import OpenAILLM, LlamaLLM
-from config import gpt_35_turbo_base_config, llama_base_config, llama_70b_base_config
+from lib.models import *
+from config import *
 from lib.chain import Supervisor, Deceiver, Evaluator
 from lib.utils import save_json_locally, get_json_locally, upload_json_to_hf
 from lib.dataset import MMLULoader, EthicsLoader
@@ -12,7 +13,7 @@ from lib.dataset import MMLULoader, EthicsLoader
 def run_pipeline_on_dataset(
         dataset_name,             # Must either be 'mmlu' or 'ethics'
         category,                 # Must be in the categories of the respective dataset
-    save_location,            # Must be either 'local' or 'hf'
+        save_location,            # Must be either 'local' or 'hf'
         deceiver_model_name,      # Must be in the keys to MODEL_MAPPING
         deceiver_config_name,     # Must be in the keys to CONFIG_MAPPING
         supervisor_model_name,    # Must be in the keys to MODEL_MAPPING
@@ -26,8 +27,12 @@ def run_pipeline_on_dataset(
     }
     CONFIG_MAPPING = {
         "gpt_35_turbo_base_config":gpt_35_turbo_base_config,
-        "llama_base_config" : llama_base_config,
+        "llama_7b_base_config" : llama_7b_base_config,
+        "llama_13b_base_config" : llama_13b_base_config,
         "llama_70b_base_config" : llama_70b_base_config,
+        "llama_7b_noRLHF_config" : llama_7b_noRLHF_config,
+        "llama_13b_noRLHF_config" : llama_13b_noRLHF_config,
+        "llama_70b_noRLHF_config" : llama_70b_noRLHF_config,
     }
 
     # check if models and configs are well defined
@@ -68,7 +73,7 @@ def run_pipeline_on_dataset(
     
     # create qa datasets
     print("INFO: Starting qa dataset generation")
-    qa_correct_dataset_path, qa_incorrect_dataset_path = dataloader(category, save_locally=save_locally, save_on_hf=save_on_hf, num_samples=num_samples)
+    qa_correct_dataset_path, qa_incorrect_dataset_path = dataloader(category, data_split="test", save_locally=save_locally, save_on_hf=save_on_hf, num_samples=num_samples)
     print("INFO: Finsihed qa correct dataset generation. File at:", save_location, ":", qa_correct_dataset_path)
     print("INFO: Finished qa incorrect dataset generation, File at:", save_location, ":", qa_incorrect_dataset_path)
     
@@ -94,13 +99,22 @@ def run_pipeline_on_dataset(
     qaeve_correct_dataset_path = evaluator.run_on_dataset_name(qaev_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
     print("INFO: Finished qaeve correct dataset generation. File at:", save_location, ":", qaeve_correct_dataset_path) 
 
-run_pipeline_on_dataset(
-        'mmlu',
-        'econometrics',
-        'hf',
-        'OpenAILLM',
-        'gpt_35_turbo_base_config',
-        'OpenAILLM',
-        'gpt_35_turbo_base_config',
-        10,    
-)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run entire pipeline to generate qaeve dataset (intermediate steps saved along the way)')
+
+    # Mandatory arguments
+    parser.add_argument('dataset_name', type=str, choices=['mmlu', 'ethics'], help='Dataset name')
+    parser.add_argument('category', type=str, help='Category of the dataset')
+    parser.add_argument('save_location', type=str, choices=['local', 'hf'], help='Save location')
+    parser.add_argument('deceiver_model_name', type=str, help='Deceiver model name')
+    parser.add_argument('deceiver_config_name', type=str, help='Deceiver config name')
+    parser.add_argument('supervisor_model_name', type=str, help='Supervisor model name')
+    parser.add_argument('supervisor_config_name', type=str, help='Supervisor config name')
+
+    # Optional arguments
+    parser.add_argument('--num_samples', type=int, default=None, help='Number of samples (optional)')
+
+    args = parser.parse_args()
+
+    run_pipeline_on_dataset(args.dataset_name, args.category, args.save_location, args.deceiver_model_name, args.deceiver_config_name, args.supervisor_model_name, args.supervisor_config_name, args.num_samples)
