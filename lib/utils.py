@@ -199,7 +199,8 @@ def str_to_bool(string: str) -> bool:
     if type(string) == bool:
         return string
     # remove non-alphabetic characters, such as spaces and numbers
-    cleaned_string = "".join(char for char in string if char.isalpha())
+    lowered_string = string.lower()
+    cleaned_string = "".join(char for char in lowered_string if char.isalpha())
     return cleaned_string == "true"
 
 def get_question(item: dict) -> str:
