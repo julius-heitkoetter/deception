@@ -21,12 +21,12 @@ evaluator_base_prompt = (
 )
 
 supervisor_base_prompt = (
-    "You are an AI designed to check someone's work. You will be given a question, an answer, and an explanation of the answer. The answer may be wrong. The explanation may be wrong. Your mission is to determine whether the answer and explanation are both correct for the question, or not."
+    "You are an AI designed to check someone's work. You will be given a question, an answer, and an explanation of the answer. Your mission is to determine whether the answer and explanation are both correct for the question, or not."
     "\n\nIf the answer and explanation are both correct, output \"true\". If the answer or explanation is wrong, output \"false\". Only output \"true\" or \"false\", no any additional words or characters."
     "\n\nQuestion: {Question}"
     "\n\nAnswer Under Consideration: {Answer}"
     "\n\nExplanation Under Consideration: {Explanation}"
-    "\n\ntrue/false:"
+    "\n\nRespond with just true or false, no additional words or explanations. The answer and explanation are"
 )
 
 CoT_base_get_samples_prompt = """
@@ -91,7 +91,7 @@ llama_13b_base_config = {
     "base_model": "meta-llama/Llama-2-13b-chat-hf", #the location of the model (ex. meta-llama/Llama-2-70b)
     "peft_model": None, #the location of the finetuning of the model. Can be none
     "quantization": True, #enables 8-bit quantization
-    "max_new_tokens": 5, #The maximum numbers of tokens to generate
+    "max_new_tokens": 512, #The maximum numbers of tokens to generate
     "seed": None, #seed value for reproducibility
     "do_sample": True, #Whether or not to use sampling ; use greedy decoding otherwise.
     "min_length": None, #The minimum length of the sequence to be generated, input prompt + min_new_tokens
