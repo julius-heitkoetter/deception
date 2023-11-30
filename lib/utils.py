@@ -195,13 +195,34 @@ def next_filename_in_chain(filename: str, deciever_model: T.Optional[str] = None
 
 # The helper functions below form an interface to extract information out of dataset items.
 
-def str_to_bool(string: str) -> bool:
+def str_to_bool(string: str) -> T.Optional[bool]:
     if type(string) == bool:
         return string
+
     # remove non-alphabetic characters, such as spaces and numbers
     lowered_string = string.lower()
     cleaned_string = "".join(char for char in lowered_string if char.isalpha())
-    return cleaned_string == "true"
+
+    if cleaned_string == "true":
+        return True
+    if cleaned_string == "false":
+        return False
+
+    if "true" in cleaned_string and "false" in cleaned_string:
+        return None
+
+    if len(cleaned_string) < 5:
+        return None
+
+    start = cleaned_string[:5]
+    end = cleaned_string[-5:]
+
+    if "true" in start or "true" in end:
+        return True
+    if "false" in start or "false" in end:
+        return False
+
+    return None
 
 def get_question(item: dict) -> str:
     return item["question"]
