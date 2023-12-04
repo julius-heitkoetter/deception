@@ -57,15 +57,9 @@ def run_pipeline_on_dataset(
     else:
         raise ValueError("Save location must either be 'local' or 'hf'")
 
-    # create language models
+    # create deciever model
     deceiver_llm = MODEL_MAPPING[deceiver_model_name](**CONFIG_MAPPING[deceiver_config_name])
-    supervisor_llms = [MODEL_MAPPING[supervisor_model_name](**CONFIG_MAPPING[supervisor_config_name])
-                     for supervisor_model_name, supervisor_config_name in zip(supervisor_model_names, supervisor_config_names)]
-
-    # create supervisor, deceiver, and evaluator
     deceiver = Deceiver(deceiver_llm)
-    supervisors = [Supervisor(supervisor_llm) for supervisor_llm in supervisor_llms]
-    evaluators = [Evaluator(supervisor_llm) for supervisor_llm in supervisor_llms]
 
     # create dataloader
     if dataset_name == 'mmlu':
@@ -81,29 +75,43 @@ def run_pipeline_on_dataset(
     print("INFO: Finsihed qa correct dataset generation. File at:", save_location, ":", qa_correct_dataset_path)
     print("INFO: Finished qa incorrect dataset generation, File at:", save_location, ":", qa_incorrect_dataset_path)
     
-    # process through the incorrect dataset (main work is done below)
+    # create explanations for correct dataset
     print("INFO: Starting qae incorrect dataset generation")
     qae_incorrect_dataset_path = deceiver.run_on_dataset_name(qa_incorrect_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
     print("INFO: Finished qae incorrect dataset generation. File at:", save_location, ":", qae_incorrect_dataset_path)
-    for supervisor, evaluator, i in zip(supervisors, evaluators, range(len(supervisors))):
-        print("INFO: Starting qaev incorrect dataset generation for supervisor number:", i)
-        qaev_incorrect_dataset_path = supervisor.run_on_dataset_name(qae_incorrect_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
-        print("INFO: Finished qaev incorrect dataset generation. File at:", save_location, ":", qaev_incorrect_dataset_path)
-        print("INFO: Starting qaeve incorrect dataset generation for evaluator number:", i)
-        qaeve_incorrect_dataset_path = evaluator.run_on_dataset_name(qaev_incorrect_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
-        print("INFO: Finished qaeve incorrect dataset generation. File at:", save_location, ":", qaeve_incorrect_dataset_path)
-   
-    # process through the correct dataset (main work is done below)
+    
+    # create explanations for correct dataset
     print("INFO: Starting qae correct dataset generation")
     qae_correct_dataset_path = deceiver.run_on_dataset_name(qa_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
     print("INFO: Finished qae correct dataset generation. File at:", save_location, ":", qae_correct_dataset_path)
-    for supervisor, evaluator, i in zip(supervisors, evaluators, range(len(supervisors))):
-        print("INFO: Starting qaev correct dataset generation for supervisor number:", i)
+    
+    for supervisor_model_name, supervisor_config_name in zip(supervisor_model_names, supervisor_config_names):
+        
+        #create models
+        supervisor_llm = MODEL_MAPPING[supervisor_model_name](**CONFIG_MAPPING[supervisor_config_name])
+        supervisor = Supervisor(supervisor_llm)
+        evaluator = Evaluator(supervisor_llm)
+        
+        # run validation and evaluation on incorrect dataset
+        print("INFO: Starting qaev incorrect dataset generation for supervisor:", supervisor_config_name)
+        qaev_incorrect_dataset_path = supervisor.run_on_dataset_name(qae_incorrect_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
+        print("INFO: Finished qaev incorrect dataset generation. File at:", save_location, ":", qaev_incorrect_dataset_path)
+        print("INFO: Starting qaeve incorrect dataset generation for evaluator:", supervisor_config_name)
+        qaeve_incorrect_dataset_path = evaluator.run_on_dataset_name(qaev_incorrect_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
+        print("INFO: Finished qaeve incorrect dataset generation. File at:", save_location, ":", qaeve_incorrect_dataset_path)
+        
+        # run validation and evaluation on correct I'm dataset
+        print("INFO: Starting qaev correct dataset generation for supervisor:", supervisor_config_name)
         qaev_correct_dataset_path = supervisor.run_on_dataset_name(qae_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
         print("INFO: Finished qaev correct dataset generation. File at:", save_location, ":", qaev_correct_dataset_path)
-        print("INFO: Starting qaeve correct dataset generation for supervisor number:", i)
+        print("INFO: Starting qaeve correct dataset generation for supervisor:", supervisor_config_name)
         qaeve_correct_dataset_path = evaluator.run_on_dataset_name(qaev_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
         print("INFO: Finished qaeve correct dataset generation. File at:", save_location, ":", qaeve_correct_dataset_path) 
+        
+        # delete models to make room on GPU
+        del supervisor
+        del evaluator
+        del supervisor_llm
 
 
 if __name__ == "__main__":
