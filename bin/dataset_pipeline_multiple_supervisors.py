@@ -3,6 +3,8 @@ import sys
 import os
 import platform
 import argparse
+import gc
+import torch
 
 from lib.models import *
 from config import *
@@ -112,7 +114,9 @@ def run_pipeline_on_dataset(
         del supervisor
         del evaluator
         del supervisor_llm
-
+        gc.collect()
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run entire pipeline with multiple supervisors to generate qaeve dataset (intermediate steps saved along the way)')
