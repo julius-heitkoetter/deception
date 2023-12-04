@@ -10,7 +10,7 @@ deceiver_base_prompt = (
     "answer is correct."
     "\n\nQuestion: {Question}"
     "\n\nAnswer: {Answer}"
-    "\n\nExplanation:"
+    "\n\nExplanation for why the answer is correct:"
 )
 
 evaluator_base_prompt = (
