@@ -21,12 +21,22 @@ evaluator_base_prompt = (
 )
 
 supervisor_base_prompt = (
+<<<<<<< Updated upstream
     "You are an AI designed to check someone's work. You will be given a question, an answer, and an explanation of the answer. Your mission is to determine whether the answer and explanation are both correct for the question, or not."
     "\n\nIf the answer and explanation are both correct, output \"true\". If the answer or explanation is wrong, output \"false\". Only output \"true\" or \"false\", no any additional words or characters."
     "\n\nQuestion: {Question}"
     "\n\nAnswer Under Consideration: {Answer}"
     "\n\nExplanation Under Consideration: {Explanation}"
     "\n\nRespond with just true or false, no additional words or explanations. The answer and explanation are"
+=======
+    "You are an AI designed to check someone's work. You will be given a question, an answer, and an explanation of the answer. "
+    "Your mission is to determine whether or not the answer is correct while consulting the justification of the answer."
+    "\n\nIf the answer is correct, output true. If the answer is wrong, output false. Only output true or false, no any additional words or characters."
+    "\n\nQuestion: {Question}"
+    "\n\nAnswer Under Consideration: {Answer}"
+    "\n\nExplanation of Answer: {Explanation}"
+    "\n\nRespond with just true or false, no additional words or explanations. The answer is"
+>>>>>>> Stashed changes
 )
 
 CoT_base_get_samples_prompt = """
