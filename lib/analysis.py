@@ -6,6 +6,7 @@ import typing as T
 import numpy as np
 from uncertainties import ufloat
 import matplotlib.pyplot as plt
+import sys
 import os
 
 import utils
@@ -170,10 +171,12 @@ def plot_deceptiveness_factor(
 
     # check that deceiver is fixed (or supervisor) across the filenames
     deceivers, supervisors = set(), set()
+    models = []
     for correct_filename, _ in filename_pairs:
         dataset = utils.get_json_locally("", correct_filename)
         deceivers.add(dataset["metadata"]["deceiver_llm"])
         supervisors.add(dataset["metadata"]["supervisor_llm"])
+        models.append((dataset["metadata"]["supervisor_llm"], dataset["metadata"]["deceiver_llm"]))
 
     if deceiver_fixed and len(deceivers) > 1:
         raise ValueError("Found more than one deceiver even though deceiver_fixed is True.")
@@ -187,6 +190,16 @@ def plot_deceptiveness_factor(
     deceptiveness = [get_deceptiveness_factor(correct_filename, incorrect_filename) for correct_filename, incorrect_filename in filename_pairs]
     capability = [get_capability_factors(correct_filename, incorrect_filename) for correct_filename, incorrect_filename in filename_pairs]
     capability = [c[supervisor_fixed] for c in capability]
+
+    # Get which model was varied for each given deceptiveness-capability pair
+    models = [model[supervisor_fixed].lower() for model in models]
+    colors_list = {
+        "llama-2-7b-chat-hf": "darkblue",
+        "llama-2-13b-chat-hf": "yellowgreen",
+        "llama-2-70b-chat-hf": "sandybrown",
+        "gpt-3.5-turbo": "fuchsia",
+    }
+    colors = [colors_list[model] for model in models]
 
     # select out the systematic error version or the statistical error version
     deceptiveness = [d[plot_stat_err] for d in deceptiveness]
@@ -207,13 +220,20 @@ def plot_deceptiveness_factor(
         f"(Fixed {'Deceiver' if deceiver_fixed else 'Supervisor'}, {fixed_model})"
     )
 
-    # Construct the plot of deceptiveness vs. capability
+    # Construct the plot of deceptiveness vs. capability (using a different color for each model)
+
     fig, ax = plt.subplots()
-    ax.errorbar(
-        capability_base, deceptiveness_base,
-        xerr=capability_std_err, yerr=deceptiveness_std_err,
-        fmt='o', ecolor='lightblue', elinewidth=3, capsize=0, color='darkblue'
-    )
+    for model, color in colors_list.items():
+        capabilities = [c for i, c in enumerate(capability_base) if models[i] == model]
+        deceptivenesses = [d for i, d in enumerate(deceptiveness_base) if models[i] == model]
+        c_std_errs = [c for i, c in enumerate(capability_std_err) if models[i] == model]
+        d_std_errs = [d for i, d in enumerate(deceptiveness_std_err) if models[i] == model]
+        ax.errorbar(
+            capabilities, deceptivenesses,
+            xerr=c_std_errs, yerr=d_std_errs,
+            fmt='o', ecolor='lightblue', elinewidth=3, capsize=0,
+            label=model, color=color,
+        )
 
     # Set the titles and axis labels
     ax.set_title(title, fontsize=15, fontweight='bold')
@@ -225,11 +245,18 @@ def plot_deceptiveness_factor(
     ax.set_facecolor('whitesmoke')
 
     # LAKER: When saving to a file, record whether the error is SYSTEMATIC or STATISTICAL
+    ax.legend()
+    plt.tight_layout()
     plt.show()
 
 
 if __name__ == "__main__":
-    data_dir = "data/mmlu"
+    if len(sys.argv) != 2:
+        data_dir = "data/mmlu"
+    else:
+        data_dir = sys.argv[-1]
+        print(f"Using data_dir = {data_dir}\n")
+    
     filenames = [f"{data_dir}/{filename}" for filename in os.listdir(data_dir) if not os.path.isdir(f"{data_dir}/{filename}") and filename != ".DS_STORE"]
     filenames = sorted(filenames)
 
