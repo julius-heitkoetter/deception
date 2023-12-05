@@ -2,6 +2,7 @@ import torch
 import openai
 from typing import Any, Callable, List, Optional
 import os
+import time
 
 import numpy as np
 import itertools
@@ -382,12 +383,13 @@ class OpenAILLM():
                 result = openai.ChatCompletion.create(model=self.model_name,
                                          messages=[{"role": "system", "content": system_intel},
                                                    {"role": "user", "content": prompt}])
+                answer = result['choices'][0]['message']['content']
             except: #TODO: replace this to catch the actual error (API error)
+                time.sleep(10)
                 print("INFO : failed called to OpenAI, trying again")
                 if i==num_tries -1:
-                    print("ERROR : max number of retries reached")        
-
-        answer = result['choices'][0]['message']['content']
+                    print("ERROR : max number of retries reached") 
+                    answer = "OPENAI ERROR"       
 
         if self.verbose:
             print("INFO: output from OpenAI LLM: ", answer)
