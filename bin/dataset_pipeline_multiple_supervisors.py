@@ -86,7 +86,14 @@ def run_pipeline_on_dataset(
     print("INFO: Starting qae correct dataset generation")
     qae_correct_dataset_path = deceiver.run_on_dataset_name(qa_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
     print("INFO: Finished qae correct dataset generation. File at:", save_location, ":", qae_correct_dataset_path)
-    
+   
+    # delete models to make room on GPU
+    del deceiver
+    del deceiver_llm
+    gc.collect()
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
+ 
     for supervisor_model_name, supervisor_config_name in zip(supervisor_model_names, supervisor_config_names):
         
         #create models
