@@ -376,10 +376,17 @@ class OpenAILLM():
         
         system_intel = "You are OpenAI's GPT model, answer my questions as correctly as you can."
 
-        result = openai.ChatCompletion.create(model=self.model_name,
-                                 messages=[{"role": "system", "content": system_intel},
-                                           {"role": "user", "content": prompt}])
-        
+        num_tries = 5
+        for i in range(num_tries):
+            try:
+                result = openai.ChatCompletion.create(model=self.model_name,
+                                         messages=[{"role": "system", "content": system_intel},
+                                                   {"role": "user", "content": prompt}])
+            except: #TODO: replace this to catch the actual error (API error)
+                print("INFO : failed called to OpenAI, trying again")
+                if i==num_tries -1:
+                    print("ERROR : max number of retries reached")        
+
         answer = result['choices'][0]['message']['content']
 
         if self.verbose:
