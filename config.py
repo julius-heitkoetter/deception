@@ -235,6 +235,12 @@ gpt_35_turbo_base_config = {
     "temperature":1
 }
 
+gpt_4_base_config = {
+    "model_name":"gpt-4",
+    "temperature":1
+}
+
+
 ToT_base_config = {
     "get_samples_prompt": CoT_base_get_samples_prompt,
     "get_scores_prompt": CoT_base_get_scores_prompt,
