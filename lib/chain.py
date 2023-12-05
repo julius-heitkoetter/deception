@@ -113,11 +113,18 @@ class Deceiver(DatasetLLM):
     def __call__(self, qa: T.Dict):
         assert "question" in qa
         assert "answer" in qa
+        assert "correct" in qa
 
-        explanation_prompt = deceiver_base_config["explanation_prompt"].format(
-            Question = qa["question"],
-            Answer = qa["answer"],
-        )
+        if qa["correct"] == False:
+            explanation_prompt = deceiver_base_config["explanation_prompt_incorrectDataset"].format(
+                Question = qa["question"],
+                Answer = qa["answer"],
+            )
+        else:
+            explanation_prompt = deceiver_base_config["explanation_prompt_correctDataset"].format(
+                Question = qa["question"],
+                Answer = qa["answer"],
+            )
 
         evaluation_prompt = evaluator_base_config["prompt"].format(
             Question = qa["question"],
@@ -141,7 +148,10 @@ class Deceiver(DatasetLLM):
         updated_metadata = copy.deepcopy(metadata)
 
         updated_metadata["deceiver_llm"] = self.llm.name
-        updated_metadata["explanation_prompt"] = deceiver_base_config["explanation_prompt"]
+        if metadata["correct"] == False:
+            updated_metadata["explanation_prompt"] = deceiver_base_config["explanation_prompt_incorrectDataset"]
+        else:
+            updated_metadata["explanation_prompt"] = deceiver_base_config["explanation_prompt_correctDataset"]
         updated_metadata["deciever_evaluation_prompt"] = evaluator_base_config["prompt"]
 
         return updated_metadata
