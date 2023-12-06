@@ -108,6 +108,10 @@ def get_deceptiveness_factor(correct_filename: str, incorrect_filename: str) -> 
     if undeceived_correct_fraction_syst_err.n == 1:
         return (None, None)
 
+    #return (
+    #    1 - deceived_correct_fraction_syst_err,
+    #    1 - deceived_correct_fraction_stat_err,
+    #)
     return (
         (1 - deceived_correct_fraction_syst_err) / (1 - undeceived_correct_fraction_syst_err),
         (1 - deceived_correct_fraction_stat_err) / (1 - undeceived_correct_fraction_stat_err),
@@ -195,9 +199,10 @@ def plot_deceptiveness_factor(
     models = [model[supervisor_fixed].lower() for model in models]
     colors_list = {
         "llama-2-7b-chat-hf": "darkblue",
-        "llama-2-13b-chat-hf": "yellowgreen",
+        "llama-2-13b-chat-hf": "olive",
         "llama-2-70b-chat-hf": "sandybrown",
         "gpt-3.5-turbo": "fuchsia",
+        "gpt-4": "mediumseagreen",
     }
     colors = [colors_list[model] for model in models]
 
@@ -228,6 +233,9 @@ def plot_deceptiveness_factor(
         deceptivenesses = [d for i, d in enumerate(deceptiveness_base) if models[i] == model]
         c_std_errs = [c for i, c in enumerate(capability_std_err) if models[i] == model]
         d_std_errs = [d for i, d in enumerate(deceptiveness_std_err) if models[i] == model]
+        if len(capabilities) == 0:
+            # no data from this model
+            continue
         ax.errorbar(
             capabilities, deceptivenesses,
             xerr=c_std_errs, yerr=d_std_errs,
@@ -245,9 +253,9 @@ def plot_deceptiveness_factor(
     ax.set_facecolor('whitesmoke')
 
     # LAKER: When saving to a file, record whether the error is SYSTEMATIC or STATISTICAL
-    ax.legend()
+    ax.legend(loc='upper left')
     plt.tight_layout()
-    plt.show()
+    plt.savefig(f"plots/{fixed_model}-decep-diff.png", dpi=400)
 
 
 if __name__ == "__main__":
@@ -267,6 +275,7 @@ if __name__ == "__main__":
     for i in range(2, len(filenames), 2):
         filename_pairs.append((filenames[i], filenames[i+1]))
         # verify that the datasets are incorrect and correct as assumed
+        # (an error here can indicate a hidden .DS_STORE file)
         assert utils.get_json_locally("", filenames[i])["metadata"]["correct"] == True, f"Error creating correct/incorrect filename pairs: {filenames[i]}"
         assert utils.get_json_locally("", filenames[i+1])["metadata"]["correct"] == False, f"Error creating correct/incorrect filename pairs: {filenames[i+1]}."
 
