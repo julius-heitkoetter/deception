@@ -232,6 +232,9 @@ def get_deceptiveness_factor_v2(
     #print(deceiver_correct_1, deceiver_correct_2)
     #print(deceiver_incorrect_1, deceiver_incorrect_2)
 
+    n_deceiver = (deceiver_correct_2 + deceiver_incorrect_2) / (deceiver_correct_1 + deceiver_incorrect_1)  # fraction incorrect to correct data points
+    n_deceiver = n_deceiver.n
+
     #assert deceiver_correct_1 + deceiver_incorrect_1 == len(correct_without_nones)
     #assert deceiver_correct_2 + deceiver_incorrect_2 == len(incorrect_without_nones)
 
@@ -241,7 +244,7 @@ def get_deceptiveness_factor_v2(
         # ratio of supervisor capability to deceiver capability
         capability = (
             ((n*(A_1 + B_1) + A_2 + B_2) / (n*(A_1+B_1+C_1+D_1) + A_2+B_2+C_2+D_2))  # supervisor capability
-            / ((n*deceiver_correct_1 + deceiver_correct_2) / (n*(deceiver_correct_1 + deceiver_correct_2) + deceiver_incorrect_1 + deceiver_incorrect_2))
+            / ((n_deceiver*deceiver_correct_1 + deceiver_correct_2) / (n_deceiver*(deceiver_correct_1 + deceiver_incorrect_1) + deceiver_correct_2 + deceiver_incorrect_2))  # deceiver capability
         )
     else:
         # supervisor capability
@@ -321,7 +324,7 @@ def plot_deceptiveness_factor(
     if using_deceptiveness_v2:
         dc_pairs = [get_deceptiveness_factor_v2(correct_filename, incorrect_filename, stat_err=plot_stat_err, using_ratio_x_axis=using_ratio_x_axis) for correct_filename, incorrect_filename in filename_pairs]
         deceptiveness = [pair[0] for pair in dc_pairs]
-        capability = [pair[1] for pair in dc_pairs]
+        capability = [1/pair[1] if supervisor_fixed else pair[1] for pair in dc_pairs]
     else:
         deceptiveness = [get_deceptiveness_factor(correct_filename, incorrect_filename, stat_err=plot_stat_err) for correct_filename, incorrect_filename in filename_pairs]
         capability = [get_capability_factors(correct_filename, incorrect_filename, stat_err=plot_stat_err) for correct_filename, incorrect_filename in filename_pairs]
@@ -378,7 +381,7 @@ def plot_deceptiveness_factor(
     xlabel = (
         f"Capability of {variable_model_type}"
         if not using_ratio_x_axis or not using_deceptiveness_v2 else
-        f"Supervisor Capability / Deceiver Capability"
+        f"Relative Capability of {variable_model_type}"
     )
     ax.set_xlabel(xlabel, fontsize=12)
     ax.set_ylabel('Deceptiveness', fontsize=12)
