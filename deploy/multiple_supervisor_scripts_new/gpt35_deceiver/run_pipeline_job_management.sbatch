@@ -15,4 +15,4 @@ source setup.sh
 echo Setup Complete
 
 echo Starting Pipeline Run
-python bin/dataset_pipeline_multiple_supervisors.py mmlu management hf OpenAILLM gpt_35_turbo_base_config LlamaLLM,LlamaLLM,OpenAILLM llama_7b_base_config,llama_13b_base_config,gpt_35_turbo_base_config
+python bin/dataset_pipeline_multiple_supervisors.py mmlu management hf OpenAILLM gpt_35_turbo_base_config LlamaLLM,LlamaLLM,OpenAILLM llama_7b_base_config,llama_13b_base_config,gpt_35_turbo_base_config --num_samples 100

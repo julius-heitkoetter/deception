@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --nodes=1 
+#SBATCH --nodes=1
 #SBATCH --time=36:00:00 
 #SBATCH --partition=single
 #SBATCH --gres=gpu:1
@@ -15,4 +15,4 @@ source setup.sh
 echo Setup Complete
 
 echo Starting Pipeline Run
-python bin/dataset_pipeline_multiple_supervisors.py mmlu high_school_physics hf LlamaLLM llama_13b_base_config LlamaLLM,LlamaLLM,OpenAILLM llama_7b_base_config,llama_13b_base_config,gpt_35_turbo_base_config --num_samples 100
+python bin/dataset_pipeline_deceiver_only.py mmlu high_school_psychology hf LlamaLLM llama_70b_base_config --num_samples 60
