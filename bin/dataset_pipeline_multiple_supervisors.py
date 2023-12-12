@@ -13,6 +13,7 @@ from lib.utils import save_json_locally, get_json_locally, upload_json_to_hf
 from lib.dataset import MMLULoader, EthicsLoader
 
 def run_pipeline_on_dataset(
+        experiment_name,          # Name of the experiment this is a part of, dictates where the model is saved
         dataset_name,             # Must either be 'mmlu' or 'ethics'
         category,                 # Must be in the categories of the respective dataset
         save_location,            # Must be either 'local' or 'hf'
@@ -48,7 +49,7 @@ def run_pipeline_on_dataset(
         if supervisor_model_name not in MODEL_MAPPING.keys():
             raise ValueError("Supervisor model not in known models")
         if supervisor_config_name not in CONFIG_MAPPING.keys():
-            raise ValueError("Supervisor config not in known configurations")
+            raise ValueError("Supervisor config not in known configurations: " + str(supervisor_config_name))
     
     if save_location=='local':
         save_locally = True
@@ -65,9 +66,9 @@ def run_pipeline_on_dataset(
 
     # create dataloader
     if dataset_name == 'mmlu':
-        dataloader = MMLULoader()
+        dataloader = MMLULoader(storage_path = os.path.join("./data/", experiment_name, dataset_name))
     elif dataset_name == 'ethics':
-        dataloader = EthicsLoader()
+        dataloader = EthicsLoader(storage_path = os.path.join("./data/", experiment_name, dataset_name))
     else:
         assert ValueError("dataset_name must either be 'mmlu' or 'ethics'")
     
@@ -132,6 +133,7 @@ if __name__ == "__main__":
         return arg.split(',')
 
     # Mandatory arguments
+    parser.add_argument('experiment_name', type=str, help='Experiment Name')
     parser.add_argument('dataset_name', type=str, choices=['mmlu', 'ethics'], help='Dataset name')
     parser.add_argument('category', type=str, help='Category of the dataset')
     parser.add_argument('save_location', type=str, choices=['local', 'hf'], help='Save location')
@@ -145,4 +147,14 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    run_pipeline_on_dataset(args.dataset_name, args.category, args.save_location, args.deceiver_model_name, args.deceiver_config_name, args.supervisor_model_names, args.supervisor_config_names, args.num_samples)
+    run_pipeline_on_dataset(
+        args.experiment_name, 
+        args.dataset_name, 
+        args.category, 
+        args.save_location, 
+        args.deceiver_model_name, 
+        args.deceiver_config_name, 
+        args.supervisor_model_names, 
+        args.supervisor_config_names, 
+        args.num_samples
+    )
