@@ -28,7 +28,7 @@ cp *_qaeve_Llama-2-13b-chat-hf_* llama_13b_deceiver/.
 cp *_qaeve_Llama-2-70b-chat-hf_* llama_70b_deceiver/.
 cp *_qaeve_gpt-3.5-turbo_* gpt_35_deceiver/.
 
-cp *_Llama-2-7b-chat-hf_202* llama_7b_supervisor/.
-cp *_Llama-2-13b-chat-hf_202* llama_13b_supervisor/.
-cp *_Llama-2-70b-chat-hf_202* llama_70b_supervisor/.
-cp *_gpt-3.5-turbo_202* gpt_35_supervisor/.
+cp *_qaeve_*_Llama-2-7b-chat-hf_202* llama_7b_supervisor/.
+cp *_qaeve_*_Llama-2-13b-chat-hf_202* llama_13b_supervisor/.
+cp *_qaeve_*_Llama-2-70b-chat-hf_202* llama_70b_supervisor/.
+cp *_qaeve_*_gpt-3.5-turbo_202* gpt_35_supervisor/.
