@@ -487,7 +487,7 @@ def make_fixed_supervisor_barplot(filename_pairs, stat_err=True):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        data_dir = "data/updated-llama-13b-supervisor/llama70b_supervisor"
+        data_dir = "data/run-2023-12-08/mmlu/llama_13b_supervisor"
     else:
         data_dir = sys.argv[-1]
         print(f"Using data_dir = {data_dir}\n")
