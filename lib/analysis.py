@@ -19,6 +19,17 @@ import utils
 #     1, 0.2   (std err after squaring is 0.2 instead of 0.1)
 
 
+
+MODEL_CONFIG_TO_NAME = {
+    "gpt-3.5-turbo": "GPT-3.5 Turbo",
+    "gpt-4": "GPT-4",
+    "llama-2-7b-chat-hf": "Llama-2 7B",
+    "llama-2-13b-chat-hf": "Llama-2 13B",
+    "llama-2-70b-chat-hf": "Llama-2 70B",
+    "none": "None"
+}
+
+
 def get_statistical_std_err(arr: T.List) -> float:
     """
     The standard error of a binomial distribution is sqrt(p*(1-p) / n).
@@ -26,6 +37,9 @@ def get_statistical_std_err(arr: T.List) -> float:
 
     # Remove None values and calculate fraction of True.
     arr = [a for a in arr if a is not None]
+    if len(arr) == 0:
+        return 0  # no statistical error, only systematic error
+
     p = len([a for a in arr if a is True]) / len(arr)
 
     return (p * (1-p) / len(arr)) ** 0.5
@@ -340,6 +354,7 @@ def plot_deceptiveness_factor(
         "gpt-4": "mediumseagreen",
     }
     colors = [colors_list[model] for model in models]
+    models = [MODEL_CONFIG_TO_NAME[model] for model in models] # hotfix for naming models well
 
     # remove None values from undefined deceptiveness factors (when supervisor gets 100% correct)
     capability = [c for i, c in enumerate(capability) if deceptiveness[i] is not None]
@@ -351,15 +366,17 @@ def plot_deceptiveness_factor(
     capability_std_err = [c.std_dev for c in capability]
 
     # Define the plot title
+    fixed_model_name = MODEL_CONFIG_TO_NAME[fixed_model.lower()]
     title = (
         "Deceptiveness vs. Capability\n"
-        f"(Fixed {'Deceiver' if deceiver_fixed else 'Supervisor'}, {fixed_model})"
+        f"(Fixed {'Deceiver' if deceiver_fixed else 'Supervisor'}, {fixed_model_name})"
     )
 
     # Construct the plot of deceptiveness vs. capability (using a different color for each model)
 
     fig, ax = plt.subplots()
     for model, color in colors_list.items():
+        model = MODEL_CONFIG_TO_NAME[model] # hotfix from model naming
         capabilities = [c for i, c in enumerate(capability_base) if models[i] == model]
         deceptivenesses = [d for i, d in enumerate(deceptiveness_base) if models[i] == model]
         c_std_errs = [c for i, c in enumerate(capability_std_err) if models[i] == model]
@@ -416,6 +433,8 @@ if __name__ == "__main__":
         # (an error here can indicate a hidden .DS_STORE file)
         assert utils.get_json_locally("", filenames[i])["metadata"]["correct"] == True, f"Error creating correct/incorrect filename pairs: {filenames[i]}"
         assert utils.get_json_locally("", filenames[i+1])["metadata"]["correct"] == False, f"Error creating correct/incorrect filename pairs: {filenames[i+1]}."
+        assert len(utils.get_json_locally("", filenames[i])["data"]) > 0, f"Error dataset {filenames[i]} has zero questions"
+        assert len(utils.get_json_locally("", filenames[i+1])["data"]) > 0, f"Error: dataset {filenames[i+1]} has zero questions."
 
     # print some information about each dataset
     for correct_filename, incorrect_filename in filename_pairs:
@@ -430,8 +449,8 @@ if __name__ == "__main__":
     # create a plotof deceptiveness by capability 
     plot_deceptiveness_factor(
         filename_pairs,
-        supervisor_fixed=True,
-        deceiver_fixed=False,
+        supervisor_fixed=False,
+        deceiver_fixed=True,
         plot_stat_err=False,
         using_deceptiveness_v2=True,
         using_ratio_x_axis=True,
