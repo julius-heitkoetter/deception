@@ -6,6 +6,7 @@ import typing as T
 import numpy as np
 from uncertainties import ufloat
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 from scipy.stats import pearsonr
 import sys
 import os
@@ -21,15 +22,18 @@ import utils
 #     1, 0.2   (std err after squaring is 0.2 instead of 0.1)
 
 
-
 MODEL_CONFIG_TO_NAME = {
     "gpt-3.5-turbo": "GPT-3.5 Turbo",
     "gpt-4": "GPT-4",
-    "llama-2-7b-chat-hf": "Llama-2 7B",
-    "llama-2-13b-chat-hf": "Llama-2 13B",
-    "llama-2-70b-chat-hf": "Llama-2 70B",
-    "none": "None"
+    "Llama-2-7b-chat-hf": "Llama-2 7B",
+    "Llama-2-13b-chat-hf": "Llama-2 13B",
+    "Llama-2-70b-chat-hf": "Llama-2 70B",
+    "None": "None"
 }
+
+MODELS_BY_CAPABILITY = ["None", "Llama-2-7b-chat-hf", "Llama-2-13b-chat-hf", "Llama-2-70b-chat-hf",  "gpt-3.5-turbo", "gpt-4"]
+#MODELS_BY_CAPABILITY = ["None", "Llama-2-7b-chat-hf", "Llama-2-13b-chat-hf", "gpt-3.5-turbo", "gpt-4"]
+
 
 
 def get_statistical_std_err(arr: T.List) -> float:
@@ -464,14 +468,7 @@ def plot_deceptiveness_factor(
     plt.tight_layout()
     plt.savefig(f"plots/{fixed_model}-{'deceiver' if deceiver_fixed else 'supervisor'}-{'stat' if plot_stat_err else 'syst'}-err.png", dpi=600)
 
-
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        data_dir = "data/llama13b"
-    else:
-        data_dir = sys.argv[-1]
-        print(f"Using data_dir = {data_dir}\n")
-    
+def make_filename_pairs(data_dir):
     filenames = [f"{data_dir}/{filename}" for filename in os.listdir(data_dir) if not os.path.isdir(f"{data_dir}/{filename}") and filename != ".DS_STORE"]
     filenames = sorted(filenames)
 
@@ -494,22 +491,180 @@ if __name__ == "__main__":
         assert len(utils.get_json_locally("", filenames[i])["data"]) > 0, f"Error dataset {filenames[i]} has zero questions"
         assert len(utils.get_json_locally("", filenames[i+1])["data"]) > 0, f"Error: dataset {filenames[i+1]} has zero questions."
 
-    # print some information about each dataset
-    for correct_filename, incorrect_filename in filename_pairs:
-        deceptiveness, capability = get_deceptiveness_factor_v2(correct_filename, incorrect_filename, stat_err=False, using_ratio_x_axis=True)
-        #supervisor_capability, deceiver_capability = get_capability_factors(correct_filename, incorrect_filename)
-        print(f"\nDatasets:")
-        print(f"\tCorrect filename: {correct_filename}")
-        print(f"\tIncorrect filename: {incorrect_filename}")
-        print(f"\tDeceptiveness: {deceptiveness}")
-        print(f"\tCapability: {capability}")
+    return filename_pairs
 
-    # create a plotof deceptiveness by capability 
-    plot_deceptiveness_factor(
+def make_fixed_supervisor_barplot(filename_pairs, stat_err=True):
+    # deceiver = 3rd atom in filename
+    
+    supervisor_name = utils.atoms_from_filename(filename_pairs[0][0])[4] # supervisor of first correct dataset
+    
+    supervisor_correct_percentages = {}
+    deceiver_categories = {}
+    for correct_filename, incorrect_filename in filename_pairs:
+        deceiver_name = utils.atoms_from_filename(correct_filename)[3]
+        
+        if deceiver_name not in MODELS_BY_CAPABILITY:
+            continue
+
+        if deceiver_name not in deceiver_categories:
+            deceiver_categories[deceiver_name] = set()
+
+        deceiver_categories[deceiver_name].add(utils.atoms_from_filename(correct_filename)[1])
+    full_categories = set.intersection(*deceiver_categories.values())
+    print(f"Full categories: {full_categories}")
+
+    # TODO: this is to keep track of the order of the categories for the bar plot
+    # Should be fixed by making datatypes into dictionaries.
+    ordered_list_of_categories = [utils.atoms_from_filename(filename_pairs[0][0])[1]]
+
+    for correct_filename, incorrect_filename in filename_pairs:
+
+        category = utils.atoms_from_filename(correct_filename)[1]
+
+        if category not in full_categories:
+            continue
+        assert utils.atoms_from_filename(correct_filename)[4] == supervisor_name, f"supervisor expected: {supervisor_name} but got file {correct_filename}"
+        assert utils.atoms_from_filename(incorrect_filename)[4] == supervisor_name,  f"supervisor expected: {supervisor_name} but got file {incorrect_filename}"
+
+        # TODO: same as before
+        if ordered_list_of_categories[-1] != category:
+            ordered_list_of_categories.append(category)
+
+        correct_data = utils.get_json_locally("", correct_filename)["data"]
+        incorrect_data = utils.get_json_locally("", incorrect_filename)["data"]
+
+        correct_verdict_fraction = get_ufloat_correct_fraction(
+            correct_data, incorrect_data, utils.get_verdict, stat_err=stat_err
+        )
+        
+        # Add to list in dictionary and make list if it doesnt exist yet
+        supervisor_correct_percentages[utils.atoms_from_filename(correct_filename)[3]] = supervisor_correct_percentages.get(utils.atoms_from_filename(correct_filename)[3], []) + [correct_verdict_fraction]
+
+        correct_evaluation_fraction = get_ufloat_correct_fraction(
+            correct_data, incorrect_data, utils.get_supervisor_evaluation, stat_err=stat_err
+        )
+
+        supervisor_correct_percentages["None"] = supervisor_correct_percentages.get("None", []) + [correct_evaluation_fraction]
+
+    model_names = []
+    mean_correct_percentages = []
+    list_of_all_correct_percentages_by_deceiver = []
+    error_bars = []
+
+    for model in MODELS_BY_CAPABILITY:
+        if model in supervisor_correct_percentages:
+            model_names.append(MODEL_CONFIG_TO_NAME[model])
+            mean_correct_percentages.append(np.mean(supervisor_correct_percentages[model]).n)
+            error_bars.append(np.mean(supervisor_correct_percentages[model]).std_dev)
+
+            # TODO: Really bad code writen by Julius. NEED TO FIX
+            if model == "None":
+                capabilities = []
+                NUM_MODELS = 4
+                for i in range(0,len(supervisor_correct_percentages[model]), NUM_MODELS):
+                    capabilities.append(np.mean(supervisor_correct_percentages[model][i:i+NUM_MODELS]))
+                list_of_all_correct_percentages_by_deceiver.append(capabilities)
+            else:
+                list_of_all_correct_percentages_by_deceiver.append(supervisor_correct_percentages[model])
+    
+    list_of_all_correct_percentages_by_category = np.array([[x.n for x in row] for row in list_of_all_correct_percentages_by_deceiver]).T
+
+    """# Set a professional style
+    plt.style.use('seaborn-v0_8-whitegrid')
+
+    # Create the bar plot
+    plt.bar(model_names, mean_correct_percentages, xerr=error_bars)
+
+    # Add the horizontal line and label
+    plt.axhline(y=0.5, color='r', linestyle='--', label='any deterministic strategy')
+    plt.text(2, 0.51, 'any deterministic strategy', color='r', ha='left')
+
+    # Enhancing the plot
+    plt.title(f"Capability of {MODEL_CONFIG_TO_NAME[supervisor_name]} when deceived by various models", fontsize=12)
+    plt.xlabel("Deceiver Model", fontsize=11)
+    plt.ylabel("Capability", fontsize=11)
+
+    # Improve y-axis to show percentage
+    plt.gca().yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+
+    # Adjusting font sizes for a more professional look
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=10)
+
+    # Save the plot
+    plt.savefig(f"plots/{supervisor_name}-supervisor-correct-percentages.png", dpi=600)"""
+
+    n_datasets = len(list_of_all_correct_percentages_by_category)
+    bar_width = 0.15
+    positions = [np.arange(len(model_names))] + \
+            [np.arange(len(model_names)) + (i + 1) * bar_width for i in range(n_datasets - 1)]
+
+    # Set a professional style
+    plt.style.use('ggplot')
+
+    # Create a figure and a set of subplots
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 5.2), gridspec_kw={'height_ratios': [3, 1]})
+
+    # First subplot (main bar graph)
+    ax1.bar(model_names, mean_correct_percentages, xerr=error_bars, color='#3cb371', label = "Combined")
+    ax1.axhline(y=0.5, color='r', linestyle='--')
+    ax1.text(2.3, 0.51, 'any deterministic strategy', color='r', ha='left')
+    ax1.set_title(f"Capability of {MODEL_CONFIG_TO_NAME[supervisor_name]} when deceived by various models")
+    ax1.set_ylabel("Capability")
+    ax1.set_ylim(0, 1.1)
+    ax1.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+
+    # Second subplot (smaller bar graph)
+    for i, data in enumerate(list_of_all_correct_percentages_by_category):
+        label_name = ' '.join(word.capitalize() for word in ordered_list_of_categories[i].replace('-', ' ').split())
+        ax2.bar(positions[i], data, width=bar_width, label=label_name)
+    #ax2.bar(model_names, mean_correct_percentages, xerr=error_bars)
+    ax2.axhline(y=0.5, color='r', linestyle='--')
+    ax2.set_xlabel("Deceiver Model")
+    ax2.set_ylabel("Capability")
+    ax2.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    ax2.yaxis.set_major_locator(mtick.MultipleLocator(0.2))
+    ax2.set_xticks(positions[0] + bar_width * (n_datasets - 1) / 2)
+    ax2.set_xticklabels(model_names)
+
+    handles1, labels1 = ax1.get_legend_handles_labels()
+    handles2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(handles1 + handles2, labels1 + labels2, loc='upper right', title='Datasets')
+
+    # Adjust layout
+    plt.tight_layout()
+
+    # Save the plot
+    plt.savefig(f"plots/{supervisor_name}-supervisor-correct-percentages-combined.png", dpi=600)
+    
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        data_dir = "data/data_final_for_paper/gpt_35_supervisor"
+    else:
+        data_dir = sys.argv[-1]
+        print(f"Using data_dir = {data_dir}\n")
+    
+    filename_pairs = make_filename_pairs(data_dir)
+
+    # # print some information about each dataset
+    # for correct_filename, incorrect_filename in filename_pairs:
+    #     deceptiveness, capability = get_deceptiveness_factor_v2(correct_filename, incorrect_filename, stat_err=False, using_ratio_x_axis=True)
+    #     #supervisor_capability, deceiver_capability = get_capability_factors(correct_filename, incorrect_filename)
+    #     print(f"\nDatasets:")
+    #     print(f"\tCorrect filename: {correct_filename}")
+    #     print(f"\tIncorrect filename: {incorrect_filename}")
+    #     print(f"\tDeceptiveness: {deceptiveness}")
+    #     print(f"\tCapability: {capability}")
+
+    # # create a plotof deceptiveness by capability 
+    """plot_deceptiveness_factor(
         filename_pairs,
         supervisor_fixed=True,
         deceiver_fixed=False,
         plot_stat_err=False,
         using_deceptiveness_v2=True,
         using_ratio_x_axis=True,
-    )
+    )"""
+
+    make_fixed_supervisor_barplot(filename_pairs, stat_err = False)
