@@ -7,8 +7,10 @@ import numpy as np
 from uncertainties import ufloat
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
+from scipy.stats import pearsonr
 import sys
 import os
+from tqdm import tqdm
 
 import utils
 
@@ -33,6 +35,7 @@ MODELS_BY_CAPABILITY = ["None", "Llama-2-7b-chat-hf", "Llama-2-13b-chat-hf", "Ll
 #MODELS_BY_CAPABILITY = ["None", "Llama-2-7b-chat-hf", "Llama-2-13b-chat-hf", "gpt-3.5-turbo", "gpt-4"]
 
 
+
 def get_statistical_std_err(arr: T.List) -> float:
     """
     The standard error of a binomial distribution is sqrt(p*(1-p) / n).
@@ -40,6 +43,9 @@ def get_statistical_std_err(arr: T.List) -> float:
 
     # Remove None values and calculate fraction of True.
     arr = [a for a in arr if a is not None]
+    if len(arr) == 0:
+        return 0  # no statistical error, only systematic error
+
     p = len([a for a in arr if a is True]) / len(arr)
 
     return (p * (1-p) / len(arr)) ** 0.5
@@ -246,6 +252,9 @@ def get_deceptiveness_factor_v2(
     #print(deceiver_correct_1, deceiver_correct_2)
     #print(deceiver_incorrect_1, deceiver_incorrect_2)
 
+    n_deceiver = (deceiver_correct_2 + deceiver_incorrect_2) / (deceiver_correct_1 + deceiver_incorrect_1)  # fraction incorrect to correct data points
+    n_deceiver = n_deceiver.n
+
     #assert deceiver_correct_1 + deceiver_incorrect_1 == len(correct_without_nones)
     #assert deceiver_correct_2 + deceiver_incorrect_2 == len(incorrect_without_nones)
 
@@ -255,7 +264,7 @@ def get_deceptiveness_factor_v2(
         # ratio of supervisor capability to deceiver capability
         capability = (
             ((n*(A_1 + B_1) + A_2 + B_2) / (n*(A_1+B_1+C_1+D_1) + A_2+B_2+C_2+D_2))  # supervisor capability
-            / ((n*deceiver_correct_1 + deceiver_correct_2) / (n*(deceiver_correct_1 + deceiver_correct_2) + deceiver_incorrect_1 + deceiver_incorrect_2))
+            / ((n_deceiver*deceiver_correct_1 + deceiver_correct_2) / (n_deceiver*(deceiver_correct_1 + deceiver_incorrect_1) + deceiver_correct_2 + deceiver_incorrect_2))  # deceiver capability
         )
     else:
         # supervisor capability
@@ -292,6 +301,49 @@ def get_capability_factors(correct_filename: str, incorrect_filename: str, stat_
         supervisor_as_evaluator_correct_fraction,
         deceiver_as_evaluator_correct_fraction
     )
+
+def get_r_value(xs, ys, x_errs=None, y_errs=None, n_iters = 10000):
+
+    assert len(xs) == len(ys)
+    if x_errs is not None or y_errs is not None:
+        assert len(x_errs) == len(xs)
+        assert len(y_errs) == len(ys)
+    else:
+        x_err = np.zeros(len(xs))
+        y_err = np.zeros(len(ys))
+
+    # Filter out all nan and inf values
+    invalid_indices = np.isnan(xs) | np.isnan(ys) | np.isinf(xs) | np.isinf(ys) | np.isnan(x_errs) | np.isnan(y_errs) | np.isinf(x_errs) | np.isinf(y_errs)
+    xs = np.array(xs)
+    ys = np.array(ys)
+    x_errs = np.array(x_errs)
+    y_errs = np.array(y_errs)
+    xs = xs[~invalid_indices]
+    ys = ys[~invalid_indices]
+    x_errs = x_errs[~invalid_indices]
+    y_errs = y_errs[~invalid_indices]
+
+    r_values = []
+
+    #rows are each iteration, collumns are each variable
+    x_values = np.array([np.random.normal(x, x_err, n_iters) for x, x_err in zip(xs, x_errs)]).T
+    y_values = np.array([np.random.normal(y, y_err, n_iters) for y, y_err in zip(ys, y_errs)]).T
+
+    #x and y are arrays of datapoints
+    for x, y in tqdm(zip(x_values, y_values)):
+
+        r_value, _ = pearsonr(x,y)
+        r_values.append(r_value)
+
+    r_values = np.array(r_values)
+    z_values = .5 * np.log((1+r_values)/(1-r_values))
+
+    print("True R-value is: ", pearsonr(xs,ys).statistic)
+    print("Predicted R-value is: ", np.mean(r_values))  
+    print("Error on R-value is:", np.std(r_values))
+    print("Error on the Z-value is:", np.std(z_values))
+
+    return pearsonr(xs,ys).statistic, np.std(r_values)
 
 
 def plot_deceptiveness_factor(
@@ -335,7 +387,7 @@ def plot_deceptiveness_factor(
     if using_deceptiveness_v2:
         dc_pairs = [get_deceptiveness_factor_v2(correct_filename, incorrect_filename, stat_err=plot_stat_err, using_ratio_x_axis=using_ratio_x_axis) for correct_filename, incorrect_filename in filename_pairs]
         deceptiveness = [pair[0] for pair in dc_pairs]
-        capability = [pair[1] for pair in dc_pairs]
+        capability = [1/pair[1] if supervisor_fixed else pair[1] for pair in dc_pairs]
     else:
         deceptiveness = [get_deceptiveness_factor(correct_filename, incorrect_filename, stat_err=plot_stat_err) for correct_filename, incorrect_filename in filename_pairs]
         capability = [get_capability_factors(correct_filename, incorrect_filename, stat_err=plot_stat_err) for correct_filename, incorrect_filename in filename_pairs]
@@ -351,6 +403,7 @@ def plot_deceptiveness_factor(
         "gpt-4": "mediumseagreen",
     }
     colors = [colors_list[model] for model in models]
+    models = [MODEL_CONFIG_TO_NAME[model] for model in models] # hotfix for naming models well
 
     # remove None values from undefined deceptiveness factors (when supervisor gets 100% correct)
     capability = [c for i, c in enumerate(capability) if deceptiveness[i] is not None]
@@ -361,16 +414,21 @@ def plot_deceptiveness_factor(
     capability_base = [c.n for c in capability]
     capability_std_err = [c.std_dev for c in capability]
 
+    # Get pearson R value and significance  
+    r_value = get_r_value(capability_base, deceptiveness_base, capability_std_err, deceptiveness_std_err)
+
     # Define the plot title
+    fixed_model_name = MODEL_CONFIG_TO_NAME[fixed_model.lower()]
     title = (
         "Deceptiveness vs. Capability\n"
-        f"(Fixed {'Deceiver' if deceiver_fixed else 'Supervisor'}, {fixed_model})"
+        f"(Fixed {'Deceiver' if deceiver_fixed else 'Supervisor'}, {fixed_model_name})"
     )
 
     # Construct the plot of deceptiveness vs. capability (using a different color for each model)
 
     fig, ax = plt.subplots()
     for model, color in colors_list.items():
+        model = MODEL_CONFIG_TO_NAME[model] # hotfix from model naming
         capabilities = [c for i, c in enumerate(capability_base) if models[i] == model]
         deceptivenesses = [d for i, d in enumerate(deceptiveness_base) if models[i] == model]
         c_std_errs = [c for i, c in enumerate(capability_std_err) if models[i] == model]
@@ -392,7 +450,7 @@ def plot_deceptiveness_factor(
     xlabel = (
         f"Capability of {variable_model_type}"
         if not using_ratio_x_axis or not using_deceptiveness_v2 else
-        f"Supervisor Capability / Deceiver Capability"
+        f"Relative Capability of {variable_model_type}"
     )
     ax.set_xlabel(xlabel, fontsize=12)
     ax.set_ylabel('Deceptiveness', fontsize=12)
@@ -402,7 +460,11 @@ def plot_deceptiveness_factor(
     ax.set_facecolor('whitesmoke')
 
     # LAKER: When saving to a file, record whether the error is SYSTEMATIC or STATISTICAL
-    ax.legend(loc='upper left')
+    if deceiver_fixed:
+        legend = ax.legend(loc='lower right')
+    else:
+        legend = ax.legend(loc='lower left')
+    plt.text(0.95, 0.97, f'r = {r_value[0]:.2f} +/- {r_value[1]:.2f}', transform=plt.gca().transAxes, horizontalalignment='right', verticalalignment='top', fontsize = 12, fontweight='bold')
     plt.tight_layout()
     plt.savefig(f"plots/{fixed_model}-{'deceiver' if deceiver_fixed else 'supervisor'}-{'stat' if plot_stat_err else 'syst'}-err.png", dpi=600)
 
@@ -426,6 +488,8 @@ def make_filename_pairs(data_dir):
         # (an error here can indicate a hidden .DS_STORE file)
         assert utils.get_json_locally("", filenames[i])["metadata"]["correct"] == True, f"Error creating correct/incorrect filename pairs: {filenames[i]}"
         assert utils.get_json_locally("", filenames[i+1])["metadata"]["correct"] == False, f"Error creating correct/incorrect filename pairs: {filenames[i+1]}."
+        assert len(utils.get_json_locally("", filenames[i])["data"]) > 0, f"Error dataset {filenames[i]} has zero questions"
+        assert len(utils.get_json_locally("", filenames[i+1])["data"]) > 0, f"Error: dataset {filenames[i+1]} has zero questions."
 
     return filename_pairs
 

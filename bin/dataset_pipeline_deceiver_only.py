@@ -3,6 +3,8 @@ import sys
 import os
 import platform
 import argparse
+import gc
+import torch
 
 from lib.models import *
 from config import *
@@ -16,8 +18,6 @@ def run_pipeline_on_dataset(
         save_location,            # Must be either 'local' or 'hf'
         deceiver_model_name,      # Must be in the keys to MODEL_MAPPING
         deceiver_config_name,     # Must be in the keys to CONFIG_MAPPING
-        supervisor_model_name,    # Must be in the keys to MODEL_MAPPING
-        supervisor_config_name,   # Must be in the keys to CONFIG_MAPPING
         num_samples = None,       # Optional integer argument, containing the number of samples
     ):
 
@@ -38,12 +38,8 @@ def run_pipeline_on_dataset(
     # check if models and configs are well defined
     if deceiver_model_name not in MODEL_MAPPING.keys():
         raise ValueError("Deceiver model not in known models")
-    if supervisor_model_name not in MODEL_MAPPING.keys():
-        raise ValueError("Supervisor model not in known models")
     if deceiver_config_name not in CONFIG_MAPPING.keys():
         raise ValueError("Deceiver config not in known configurations")
-    if supervisor_config_name not in CONFIG_MAPPING.keys():
-        raise ValueError("Supervisor config not in known configurations")
     
     if save_location=='local':
         save_locally = True
@@ -54,14 +50,9 @@ def run_pipeline_on_dataset(
     else:
         raise ValueError("Save location must either be 'local' or 'hf'")
 
-    # create language models
+    # create deciever model
     deceiver_llm = MODEL_MAPPING[deceiver_model_name](**CONFIG_MAPPING[deceiver_config_name])
-    supervisor_llm = MODEL_MAPPING[supervisor_model_name](**CONFIG_MAPPING[supervisor_config_name])
-
-    # create supervisor, deceiver, and evaluator
     deceiver = Deceiver(deceiver_llm)
-    supervisor = Supervisor(supervisor_llm)
-    evaluator = Evaluator(supervisor_llm)
 
     # create dataloader
     if dataset_name == 'mmlu':
@@ -77,31 +68,28 @@ def run_pipeline_on_dataset(
     print("INFO: Finsihed qa correct dataset generation. File at:", save_location, ":", qa_correct_dataset_path)
     print("INFO: Finished qa incorrect dataset generation, File at:", save_location, ":", qa_incorrect_dataset_path)
     
-    # process through the incorrect dataset (main work is done below)
+    # create explanations for correct dataset
     print("INFO: Starting qae incorrect dataset generation")
     qae_incorrect_dataset_path = deceiver.run_on_dataset_name(qa_incorrect_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
     print("INFO: Finished qae incorrect dataset generation. File at:", save_location, ":", qae_incorrect_dataset_path)
-    print("INFO: Starting qaev incorrect dataset generation")
-    qaev_incorrect_dataset_path = supervisor.run_on_dataset_name(qae_incorrect_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
-    print("INFO: Finished qaev incorrect dataset generation. File at:", save_location, ":", qaev_incorrect_dataset_path)
-    print("INFO: Starting qaeve incorrect dataset generation")
-    qaeve_incorrect_dataset_path = evaluator.run_on_dataset_name(qaev_incorrect_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
-    print("INFO: Finished qaeve incorrect dataset generation. File at:", save_location, ":", qaeve_incorrect_dataset_path)
-   
-    # process through the correct dataset (main work is done below)
+    
+    # create explanations for correct dataset
     print("INFO: Starting qae correct dataset generation")
     qae_correct_dataset_path = deceiver.run_on_dataset_name(qa_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
     print("INFO: Finished qae correct dataset generation. File at:", save_location, ":", qae_correct_dataset_path)
-    print("INFO: Starting qaev correct dataset generation")
-    qaev_correct_dataset_path = supervisor.run_on_dataset_name(qae_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
-    print("INFO: Finished qaev correct dataset generation. File at:", save_location, ":", qaev_correct_dataset_path)
-    print("INFO: Starting qaeve correct dataset generation")
-    qaeve_correct_dataset_path = evaluator.run_on_dataset_name(qaev_correct_dataset_path, save_locally=save_locally, save_on_hf=save_on_hf)
-    print("INFO: Finished qaeve correct dataset generation. File at:", save_location, ":", qaeve_correct_dataset_path) 
-
-
+   
+    # delete models to make room on GPU
+    del deceiver
+    del deceiver_llm
+    gc.collect()
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
+ 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Run entire pipeline to generate qaeve dataset (intermediate steps saved along the way)')
+    parser = argparse.ArgumentParser(description='Run entire pipeline with one deceiver to generate qae dataset (intermediate steps saved along the way)')
+
+    def list_of_strings(arg):
+        return arg.split(',')
 
     # Mandatory arguments
     parser.add_argument('dataset_name', type=str, choices=['mmlu', 'ethics'], help='Dataset name')
@@ -109,12 +97,10 @@ if __name__ == "__main__":
     parser.add_argument('save_location', type=str, choices=['local', 'hf'], help='Save location')
     parser.add_argument('deceiver_model_name', type=str, help='Deceiver model name')
     parser.add_argument('deceiver_config_name', type=str, help='Deceiver config name')
-    parser.add_argument('supervisor_model_name', type=str, help='Supervisor model name')
-    parser.add_argument('supervisor_config_name', type=str, help='Supervisor config name')
 
     # Optional arguments
     parser.add_argument('--num_samples', type=int, default=None, help='Number of samples (optional)')
 
     args = parser.parse_args()
 
-    run_pipeline_on_dataset(args.dataset_name, args.category, args.save_location, args.deceiver_model_name, args.deceiver_config_name, args.supervisor_model_name, args.supervisor_config_name, args.num_samples)
+    run_pipeline_on_dataset(args.dataset_name, args.category, args.save_location, args.deceiver_model_name, args.deceiver_config_name, args.num_samples)

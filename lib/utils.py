@@ -193,6 +193,7 @@ def next_filename_in_chain(filename: str, deciever_model: T.Optional[str] = None
 
     return filename_from_atoms(dataset, category, next_stage, deceiver_model_name, supervisor_model_name, timestamp)
 
+
 # The helper functions below form an interface to extract information out of dataset items.
 
 def str_to_bool(string: str) -> T.Optional[bool]:
@@ -244,3 +245,4 @@ def get_deceiver_evaluation(item: dict) -> bool:
 
 def get_supervisor_evaluation(item: dict) -> bool:
     return str_to_bool(item["evaluation-supervisor"])
+
