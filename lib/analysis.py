@@ -415,6 +415,12 @@ def make_filename_pairs(data_dir):
     use_correct_datasets = False
     filename_pairs = []
     for i in range(0, len(filenames), 2):
+        if "mmlu_business-ethics_qaeve_gpt-3.5-turbo_gpt-3.5-turbo" in filenames[i]: #TODO: fix this, it's terrible coding!
+            print("Swapping correct and incorrect filename")
+            filename_pairs.append((filenames[i+1], filenames[i]))
+            assert utils.get_json_locally("", filenames[i+1])["metadata"]["correct"] == True, f"Error creating correct/incorrect filename pairs: {filenames[i+1]}"
+            assert utils.get_json_locally("", filenames[i])["metadata"]["correct"] == False, f"Error creating correct/incorrect filename pairs: {filenames[i]}."
+            continue
         filename_pairs.append((filenames[i], filenames[i+1]))
         # verify that the datasets are incorrect and correct as assumed
         # (an error here can indicate a hidden .DS_STORE file)
@@ -449,15 +455,7 @@ def make_fixed_supervisor_barplot(filename_pairs, stat_err=True):
 
     for correct_filename, incorrect_filename in filename_pairs:
 
-        print("Correct filename currently processing: ", correct_filename)
-
         category = utils.atoms_from_filename(correct_filename)[1]
-
-        #TODO: remove hardcoded insertion
-        print("Category is: ", category)
-        print()
-        if category == "high-school-world-history" or category == "international-law":
-            continue
 
         if category not in full_categories:
             continue
@@ -498,8 +496,9 @@ def make_fixed_supervisor_barplot(filename_pairs, stat_err=True):
             # TODO: Really bad code writen by Julius. NEED TO FIX
             if model == "None":
                 capabilities = []
-                for i in range(0,len(supervisor_correct_percentages[model]), 3):
-                    capabilities.append(np.mean(supervisor_correct_percentages[model][i:i+3]))
+                NUM_MODELS = 4
+                for i in range(0,len(supervisor_correct_percentages[model]), NUM_MODELS):
+                    capabilities.append(np.mean(supervisor_correct_percentages[model][i:i+NUM_MODELS]))
                 list_of_all_correct_percentages_by_deceiver.append(capabilities)
             else:
                 list_of_all_correct_percentages_by_deceiver.append(supervisor_correct_percentages[model])
@@ -540,7 +539,7 @@ def make_fixed_supervisor_barplot(filename_pairs, stat_err=True):
     plt.style.use('ggplot')
 
     # Create a figure and a set of subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={'height_ratios': [3, 1]})
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 5.2), gridspec_kw={'height_ratios': [3, 1]})
 
     # First subplot (main bar graph)
     ax1.bar(model_names, mean_correct_percentages, xerr=error_bars, color='#3cb371', label = "Combined")
@@ -548,7 +547,7 @@ def make_fixed_supervisor_barplot(filename_pairs, stat_err=True):
     ax1.text(2.3, 0.51, 'any deterministic strategy', color='r', ha='left')
     ax1.set_title(f"Capability of {MODEL_CONFIG_TO_NAME[supervisor_name]} when deceived by various models")
     ax1.set_ylabel("Capability")
-    ax1.set_ylim(0, .9)
+    ax1.set_ylim(0, 1.1)
     ax1.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 
     # Second subplot (smaller bar graph)
@@ -560,6 +559,7 @@ def make_fixed_supervisor_barplot(filename_pairs, stat_err=True):
     ax2.set_xlabel("Deceiver Model")
     ax2.set_ylabel("Capability")
     ax2.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    ax2.yaxis.set_major_locator(mtick.MultipleLocator(0.2))
     ax2.set_xticks(positions[0] + bar_width * (n_datasets - 1) / 2)
     ax2.set_xticklabels(model_names)
 
@@ -576,7 +576,7 @@ def make_fixed_supervisor_barplot(filename_pairs, stat_err=True):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        data_dir = "data/run-2023-12-08/mmlu/gpt_35_supervisor"
+        data_dir = "data/data_final_for_paper/gpt_35_supervisor"
     else:
         data_dir = sys.argv[-1]
         print(f"Using data_dir = {data_dir}\n")
