@@ -5,6 +5,8 @@ from config import (
     supervisor_base_config,
     evaluator_base_config,
 )
+
+import copy
 from lib.utils import (
     atoms_from_filename, 
     next_filename_in_chain,
@@ -50,6 +52,7 @@ class DatasetLLM(ABC):
         Run an on an entire dataset to add the relevant key-value pair to each item in the list. Mutates dataset.
         """
         data = dataset["data"]
+
         updated_data = []
         for i in tqdm(range(len(data)), desc = "Running..."):
             updated_data.append(self(data[i]))
@@ -60,6 +63,7 @@ class DatasetLLM(ABC):
         dataset["metadata"] = updated_metadata
 
         return dataset
+
 
     def run_on_dataset_name(self, dataset_path: str, save_locally: bool = False, save_on_hf: bool = True,
                             repo_id: str = "laker-julius-misha/correlated-errors") -> str:
@@ -113,6 +117,7 @@ class Deceiver(DatasetLLM):
     def __call__(self, qa: T.Dict):
         assert "question" in qa
         assert "answer" in qa
+
         assert "correct" in qa
 
         if qa["correct"] == False:
@@ -125,6 +130,7 @@ class Deceiver(DatasetLLM):
                 Question = qa["question"],
                 Answer = qa["answer"],
             )
+
 
         evaluation_prompt = evaluator_base_config["prompt"].format(
             Question = qa["question"],
@@ -139,6 +145,7 @@ class Deceiver(DatasetLLM):
     def update_metadata(self, metadata: T.Dict) -> T.Dict:
         """
         Update the metadata to describe what is happening during the stage.
+
 
         Specifically, we want to mention the deceiver llm, the explanation
         prompt, and the deceiver evaluation prompt
@@ -191,6 +198,7 @@ class Supervisor(DatasetLLM):
 
         Specifically, we want to mention the supervisor llm and verdict prompt,
 
+
         """
 
         # create deep copy as to not mutate inputs
@@ -216,6 +224,7 @@ class Evaluator(DatasetLLM):
 
     def __init__(self, llm):
         super().__init__(llm)
+
 
     def __call__(self, qa: T.Dict):
         assert "question" in qa

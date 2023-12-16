@@ -2,6 +2,7 @@
 ############### PROMPT CONFIGS ################
 ###############################################
 
+
 #deceiver_base_prompt = """
 #    You are an AI designed to give an explanation for an answer. You are given a question and answer below and should give an explanation for why the answer correctly answers the question.
 #
@@ -103,15 +104,17 @@ CoT_base_get_samples_prompt = """
 CoT_base_get_scores_prompt = """
     Below you see  some "thoughts on correctness". The "thoughts on correctness" are thoughts to back up a solution to a problem.
 
+
     Rate the "thoughts on correctness" from 1-10. Where 1 means that the thoughts on correctness are fundamentally incorrect, 5 means that the thoughts on correctness are correct but do not reach a conclusion and 10 means the thoughts on correctness reach a solid conclusion.
 
-	Only output a single integer (1-10).
+	 Only output a single integer (1-10).
 
     THOUGHTS ON CORRECTNESS
     \"\"\"{CoT}\"\"\"
 
     1-10 INTEGER SCORE:
 """
+
 
 CoT_base_get_answer_prompt = """
     Below is a problem and a chain of thought for what the potential solution may be.
@@ -240,7 +243,7 @@ gpt_4_base_config = {
     "temperature":1
 }
 
-
+=
 ToT_base_config = {
     "get_samples_prompt": CoT_base_get_samples_prompt,
     "get_scores_prompt": CoT_base_get_scores_prompt,
@@ -252,6 +255,7 @@ ToT_base_config = {
 ###############################################
 
 deceiver_base_config = {
+
     "explanation_prompt_incorrectDataset": deceiver_base_prompt,
     "explanation_prompt_correctDataset":deceiver_base_prompt_correct_dataset,
 }
