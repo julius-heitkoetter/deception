@@ -13,9 +13,14 @@ import numpy as np
 
 if platform.system() == "Windows":
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "lib"))
+
     from utils import save_json_locally, get_json_locally, upload_json_to_hf
 else:
     from lib.utils import save_json_locally, get_json_locally, upload_json_to_hf
+    from utils import save_json_locally, get_json_locally, upload_json_to_hf, filename_from_atoms
+else:
+    from lib.utils import save_json_locally, get_json_locally, upload_json_to_hf, filename_from_atoms
+
 
 
 ETHICS_CATEGORIES = ['commonsense', 'deontology', 'justice', 'utilitarianism', 'virtue']
@@ -67,11 +72,10 @@ class DataLoader(ABC):
         new_json_from_template['metadata']['correct'] = correct
         return new_json_from_template
     
-    def upload_file(self, data: dict, save_locally: bool = False, save_on_hf: bool = False):
-        date_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    def upload_file(self, data: dict, category: str, save_locally: bool = False, save_on_hf: bool = False):
         correct_incorrect = "correct" if data['metadata']['correct'] else "incorrect"
-        category = data['metadata']['category']
-        file_name = f"qa-{correct_incorrect}-{self.dataset_name}-{category}-{date_id}.json"
+        file_name = filename_from_atoms(self.dataset_name, category, "qa")
         full_storage_path = f"{self.final_storage_path}/{file_name}"
 
         if save_locally:
@@ -117,7 +121,8 @@ class MMLULoader(DataLoader):
         Outupts:
             (tuple[str]) path/filenames to json files 
         """
-        assert category in MMLU_CATEGORIES, f"category: {category} not in MMLU categories"
+
+        assert category in MMLU_CATEGORIES, f"category: {category} not in MMLU categories."
         assert data_split in MMLU_DATA_SPLITS, f"data split: {data_split} not in MMLU data splits"
 
         json_correct, json_incorrect = self._mmlu_to_json(category, data_split)
@@ -132,9 +137,12 @@ class MMLULoader(DataLoader):
             np.random.shuffle(data_incorrect)
             json_incorrect = {'metadata': json_incorrect['metadata'], 'data':data_incorrect[:num_samples]}
 
-        correct_path = self.upload_file(json_correct, save_locally=save_locally, save_on_hf=save_on_hf)
-        incorrect_path = self.upload_file(json_incorrect, save_locally=save_locally, save_on_hf=save_on_hf)
 
+        # replace all underscores with hyphens in the category for the proper naming
+        category = category.replace("_", "-")
+
+        correct_path = self.upload_file(json_correct, category, save_locally=save_locally, save_on_hf=save_on_hf)
+        incorrect_path = self.upload_file(json_incorrect, category, save_locally=save_locally, save_on_hf=save_on_hf)
         return correct_path, incorrect_path
 
     def _mmlu_to_json(self, category, split):
@@ -148,11 +156,12 @@ class MMLULoader(DataLoader):
         for question_data in load_dataset(self.hf_dataset_src_path, category, split=split):
             for i, answer in enumerate(question_data['choices']):
                 is_correct = i == question_data['answer'] # True if answer choice is correct, else False
-                new_question = [{
+
+                new_question = {
                     'question': question_data['question'],
                     'answer': answer,
                     'correct': is_correct
-                }]
+                }
                 if is_correct:
                     json_dict_correct['data'].append(new_question)
                 else:
@@ -211,8 +220,9 @@ class EthicsLoader(DataLoader):
             np.random.shuffle(data_incorrect)
             json_incorrect = {'metadata': json_incorrect['metadata'], 'data':data_incorrect[:num_samples]}
 
-        correct_path = self.upload_file(json_correct, save_locally=save_locally, save_on_hf=save_on_hf)
-        incorrect_path = self.upload_file(json_incorrect, save_locally=save_locally, save_on_hf=save_on_hf)
+
+        correct_path = self.upload_file(json_correct, category, save_locally=save_locally, save_on_hf=save_on_hf)
+        incorrect_path = self.upload_file(json_incorrect, category, save_locally=save_locally, save_on_hf=save_on_hf)
 
         return correct_path, incorrect_path
 
@@ -301,4 +311,5 @@ class EthicsLoader(DataLoader):
             'question': question_data['question'],
             'answer': answer_strings[int(not is_correct)],
             'correct': False
+
         })
