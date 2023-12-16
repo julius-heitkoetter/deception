@@ -456,7 +456,10 @@ def plot_deceptiveness_factor(
     ax.set_facecolor('whitesmoke')
 
     # LAKER: When saving to a file, record whether the error is SYSTEMATIC or STATISTICAL
-    legend = ax.legend(loc='lower right')
+    if deceiver_fixed:
+        legend = ax.legend(loc='lower right')
+    else:
+        legend = ax.legend(loc='lower left')
     plt.text(0.95, 0.97, f'r = {r_value[0]:.2f} +/- {r_value[1]:.2f}', transform=plt.gca().transAxes, horizontalalignment='right', verticalalignment='top', fontsize = 12, fontweight='bold')
     plt.tight_layout()
     plt.savefig(f"plots/{fixed_model}-{'deceiver' if deceiver_fixed else 'supervisor'}-{'stat' if plot_stat_err else 'syst'}-err.png", dpi=600)
@@ -477,6 +480,12 @@ if __name__ == "__main__":
     use_correct_datasets = False
     filename_pairs = []
     for i in range(0, len(filenames), 2):
+        if "mmlu_business-ethics_qaeve_gpt-3.5-turbo_gpt-3.5-turbo" in filenames[i]: #TODO: fix this, it's terrible coding!
+            print("Swapping correct and incorrect filename")
+            filename_pairs.append((filenames[i+1], filenames[i]))
+            assert utils.get_json_locally("", filenames[i+1])["metadata"]["correct"] == True, f"Error creating correct/incorrect filename pairs: {filenames[i+1]}"
+            assert utils.get_json_locally("", filenames[i])["metadata"]["correct"] == False, f"Error creating correct/incorrect filename pairs: {filenames[i]}."
+            continue
         filename_pairs.append((filenames[i], filenames[i+1]))
         # verify that the datasets are incorrect and correct as assumed
         # (an error here can indicate a hidden .DS_STORE file)
@@ -498,8 +507,8 @@ if __name__ == "__main__":
     # create a plotof deceptiveness by capability 
     plot_deceptiveness_factor(
         filename_pairs,
-        supervisor_fixed=False,
-        deceiver_fixed=True,
+        supervisor_fixed=True,
+        deceiver_fixed=False,
         plot_stat_err=False,
         using_deceptiveness_v2=True,
         using_ratio_x_axis=True,
