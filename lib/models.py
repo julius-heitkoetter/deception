@@ -1,6 +1,8 @@
 import torch
 import openai
 from typing import Any, Callable, List, Optional
+import os
+import time
 
 import numpy as np
 import itertools
@@ -295,7 +297,7 @@ class LlamaLLM():
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        self.name = "llama"
+        self.name = os.path.basename(self.base_model)
 
         #Packages needed
         from peft import PeftModel
@@ -375,11 +377,19 @@ class OpenAILLM():
         
         system_intel = "You are OpenAI's GPT model, answer my questions as correctly as you can."
 
-        result = openai.ChatCompletion.create(model=self.model_name,
-                                 messages=[{"role": "system", "content": system_intel},
-                                           {"role": "user", "content": prompt}])
-        
-        answer = result['choices'][0]['message']['content']
+        num_tries = 5
+        for i in range(num_tries):
+            try:
+                result = openai.ChatCompletion.create(model=self.model_name,
+                                         messages=[{"role": "system", "content": system_intel},
+                                                   {"role": "user", "content": prompt}])
+                answer = result['choices'][0]['message']['content']
+            except: #TODO: replace this to catch the actual error (API error)
+                time.sleep(10)
+                print("INFO : failed called to OpenAI, trying again")
+                if i==num_tries -1:
+                    print("ERROR : max number of retries reached") 
+                    answer = "OPENAI ERROR"       
 
         if self.verbose:
             print("INFO: output from OpenAI LLM: ", answer)
