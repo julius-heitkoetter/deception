@@ -6,8 +6,10 @@ import typing as T
 import numpy as np
 from uncertainties import ufloat
 import matplotlib.pyplot as plt
+from scipy.stats import pearsonr
 import sys
 import os
+from tqdm import tqdm
 
 import utils
 
@@ -296,6 +298,49 @@ def get_capability_factors(correct_filename: str, incorrect_filename: str, stat_
         deceiver_as_evaluator_correct_fraction
     )
 
+def get_r_value(xs, ys, x_errs=None, y_errs=None, n_iters = 10000):
+
+    assert len(xs) == len(ys)
+    if x_errs is not None or y_errs is not None:
+        assert len(x_errs) == len(xs)
+        assert len(y_errs) == len(ys)
+    else:
+        x_err = np.zeros(len(xs))
+        y_err = np.zeros(len(ys))
+
+    # Filter out all nan and inf values
+    invalid_indices = np.isnan(xs) | np.isnan(ys) | np.isinf(xs) | np.isinf(ys) | np.isnan(x_errs) | np.isnan(y_errs) | np.isinf(x_errs) | np.isinf(y_errs)
+    xs = np.array(xs)
+    ys = np.array(ys)
+    x_errs = np.array(x_errs)
+    y_errs = np.array(y_errs)
+    xs = xs[~invalid_indices]
+    ys = ys[~invalid_indices]
+    x_errs = x_errs[~invalid_indices]
+    y_errs = y_errs[~invalid_indices]
+
+    r_values = []
+
+    #rows are each iteration, collumns are each variable
+    x_values = np.array([np.random.normal(x, x_err, n_iters) for x, x_err in zip(xs, x_errs)]).T
+    y_values = np.array([np.random.normal(y, y_err, n_iters) for y, y_err in zip(ys, y_errs)]).T
+
+    #x and y are arrays of datapoints
+    for x, y in tqdm(zip(x_values, y_values)):
+
+        r_value, _ = pearsonr(x,y)
+        r_values.append(r_value)
+
+    r_values = np.array(r_values)
+    z_values = .5 * np.log((1+r_values)/(1-r_values))
+
+    print("True R-value is: ", pearsonr(xs,ys).statistic)
+    print("Predicted R-value is: ", np.mean(r_values))  
+    print("Error on R-value is:", np.std(r_values))
+    print("Error on the Z-value is:", np.std(z_values))
+
+    return pearsonr(xs,ys).statistic, np.std(r_values)
+
 
 def plot_deceptiveness_factor(
     filename_pairs: T.List[T.Tuple[str, str]],
@@ -365,6 +410,9 @@ def plot_deceptiveness_factor(
     capability_base = [c.n for c in capability]
     capability_std_err = [c.std_dev for c in capability]
 
+    # Get pearson R value and significance  
+    r_value = get_r_value(capability_base, deceptiveness_base, capability_std_err, deceptiveness_std_err)
+
     # Define the plot title
     fixed_model_name = MODEL_CONFIG_TO_NAME[fixed_model.lower()]
     title = (
@@ -408,7 +456,8 @@ def plot_deceptiveness_factor(
     ax.set_facecolor('whitesmoke')
 
     # LAKER: When saving to a file, record whether the error is SYSTEMATIC or STATISTICAL
-    ax.legend(loc='upper left')
+    legend = ax.legend(loc='lower right')
+    plt.text(0.95, 0.97, f'r = {r_value[0]:.2f} +/- {r_value[1]:.2f}', transform=plt.gca().transAxes, horizontalalignment='right', verticalalignment='top', fontsize = 12, fontweight='bold')
     plt.tight_layout()
     plt.savefig(f"plots/{fixed_model}-{'deceiver' if deceiver_fixed else 'supervisor'}-{'stat' if plot_stat_err else 'syst'}-err.png", dpi=600)
 
