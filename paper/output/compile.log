@@ -1,0 +1,55 @@
+Rc files read:
+  NONE
+Latexmk: Run number 1 of rule 'pdflatex'
+This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013)
+ restricted \write18 enabled.
+entering extended mode
+Latexmk: Getting log file 'natnotes.log'
+Latexmk: Run number 2 of rule 'pdflatex'
+This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013)
+ restricted \write18 enabled.
+entering extended mode
+Latexmk: Getting log file 'natnotes.log'
+
+Latexmk: Run number 1 of rule 'pdflatex'
+This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013)
+ restricted \write18 enabled.
+entering extended mode
+Latexmk: Getting log file 'paper.log'
+Latexmk: Run number 1 of rule 'bibtex paper'
+Warning--empty journal in GuoEvaluatingLLMsSurvey
+Warning--empty journal in SurveyHallucinations
+Warning--empty journal in LiangHolisticEvals
+Warning--empty journal in BigBench
+(There were 4 warnings)
+Latexmk: Run number 2 of rule 'pdflatex'
+This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013)
+ restricted \write18 enabled.
+entering extended mode
+Latexmk: Getting log file 'paper.log'
+Latexmk: Run number 2 of rule 'bibtex paper'
+Warning--empty journal in GuoEvaluatingLLMsSurvey
+Warning--empty journal in SurveyHallucinations
+Warning--empty journal in LiangHolisticEvals
+Warning--empty journal in BigBench
+(There were 4 warnings)
+Latexmk: Run number 3 of rule 'pdflatex'
+This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013)
+ restricted \write18 enabled.
+entering extended mode
+Latexmk: Getting log file 'paper.log'
+Latexmk: Run number 3 of rule 'bibtex paper'
+Warning--empty journal in GuoEvaluatingLLMsSurvey
+Warning--empty journal in SurveyHallucinations
+Warning--empty journal in LiangHolisticEvals
+Warning--empty journal in BigBench
+(There were 4 warnings)
+Latexmk: Run number 4 of rule 'pdflatex'
+This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013)
+ restricted \write18 enabled.
+entering extended mode
+Latexmk: Getting log file 'paper.log'
+Collected error summary (may duplicate other messages):
+  pdflatex: Command for 'pdflatex' gave return code 1
+      Refer to 'paper.log' and/or above output for details
+
