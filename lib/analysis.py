@@ -32,8 +32,6 @@ MODEL_CONFIG_TO_NAME = {
 }
 
 MODELS_BY_CAPABILITY = ["None", "Llama-2-7b-chat-hf", "Llama-2-13b-chat-hf", "Llama-2-70b-chat-hf",  "gpt-3.5-turbo", "gpt-4"]
-#MODELS_BY_CAPABILITY = ["None", "Llama-2-7b-chat-hf", "Llama-2-13b-chat-hf", "gpt-3.5-turbo", "gpt-4"]
-
 
 
 def get_statistical_std_err(arr: T.List) -> float:
@@ -120,7 +118,7 @@ def get_ufloat_correct_intersection(
     results1 = get_correct_list(dataset, correct_fn1)  # each entry is True, False, or None
     results2 = get_correct_list(dataset, correct_fn2)  # each entry is True, False, or None
     results = [
-        (r1 == fn1_expected_value and r2 == fn2_expected_value) if (r1 is not None and r2 is not None) else None
+        None if r1 is None or r2 is None else (r1 == fn1_expected_value and r2 == fn2_expected_value)
         for r1, r2 in zip(results1, results2)
     ]
     syst_std_err = get_statistical_std_err(results)
@@ -130,9 +128,9 @@ def get_ufloat_correct_intersection(
         for i, item in enumerate(dataset)
         if results[i] is not None  # throw out invalid values
     ])
-    num_non_none = len([r for r in results if r is not None])
-    correct_syst = ufloat(correct_fraction, syst_std_err) * num_non_none
-    correct_stat = ufloat(correct_fraction, stat_std_err) * num_non_none
+    num_not_none = len([r for r in results if r is not None])
+    correct_syst = ufloat(correct_fraction, syst_std_err) * num_not_none
+    correct_stat = ufloat(correct_fraction, stat_std_err) * num_not_none
     return (correct_syst, correct_stat)[stat_err]
 
 
@@ -183,7 +181,6 @@ def get_deceptiveness_factor(correct_filename: str, incorrect_filename: str, sta
         return None
 
     return 1 - deceived_correct_fraction
-    #return (1 - deceived_correct_fraction) / (1 - undeceived_correct_fraction)
 
 
 def get_deceptiveness_factor_v2(
@@ -231,12 +228,6 @@ def get_deceptiveness_factor_v2(
 
     correct_without_nones = [i for i in correct_data if evaluator_fn(i) is not None and verdict_fn(i) is not None]
     incorrect_without_nones = [i for i in incorrect_data if evaluator_fn(i) is not None and verdict_fn(i) is not None]
-    #print(A_1, A_2)
-    #print(B_1, B_2)
-    #print(C_1, C_2)
-    #print(D_1, D_2)
-    #assert int((A_1 + B_1 + C_1 + D_1).n) == len(correct_without_nones)
-    #assert int((A_2 + B_2 + C_2 + D_2).n) == len(incorrect_without_nones)
 
     n = (A_2+B_2+C_2+D_2) / (A_1+B_1+C_1+D_1)
     n = n.n  # set n to be a plain number, no uncertainty
@@ -248,15 +239,8 @@ def get_deceptiveness_factor_v2(
     deceiver_incorrect_2 = get_ufloat_correct_intersection(incorrect_data, evaluator_fn, utils.get_correct, False, True, stat_err=stat_err)
     n_deceiver = (deceiver_incorrect_1 + deceiver_incorrect_2) / (deceiver_correct_1 + deceiver_correct_2)
 
-    #print()
-    #print(deceiver_correct_1, deceiver_correct_2)
-    #print(deceiver_incorrect_1, deceiver_incorrect_2)
-
     n_deceiver = (deceiver_correct_2 + deceiver_incorrect_2) / (deceiver_correct_1 + deceiver_incorrect_1)  # fraction incorrect to correct data points
     n_deceiver = n_deceiver.n
-
-    #assert deceiver_correct_1 + deceiver_incorrect_1 == len(correct_without_nones)
-    #assert deceiver_correct_2 + deceiver_incorrect_2 == len(incorrect_without_nones)
 
     deceptiveness = (n*B_1 + B_2) / (n*(A_1 + B_1) + A_2 + B_2) # fraction of times we flip from right to wrong when we started as right
 
@@ -270,7 +254,6 @@ def get_deceptiveness_factor_v2(
         # supervisor capability
         capability = (n*(A_1 + B_1) + A_2 + B_2) / (n*(A_1+B_1+C_1+D_1) + A_2+B_2+C_2+D_2)
 
-    #print(deceptiveness, capability)
     return deceptiveness, capability
 
 
@@ -303,6 +286,7 @@ def get_capability_factors(correct_filename: str, incorrect_filename: str, stat_
     )
 
 def get_r_value(xs, ys, x_errs=None, y_errs=None, n_iters = 10000):
+    # Returns Pearson correlation coefficient r
 
     assert len(xs) == len(ys)
     if x_errs is not None or y_errs is not None:
@@ -325,18 +309,17 @@ def get_r_value(xs, ys, x_errs=None, y_errs=None, n_iters = 10000):
 
     r_values = []
 
-    #rows are each iteration, collumns are each variable
+    # rows are each iteration, collumns are each variable
     x_values = np.array([np.random.normal(x, x_err, n_iters) for x, x_err in zip(xs, x_errs)]).T
     y_values = np.array([np.random.normal(y, y_err, n_iters) for y, y_err in zip(ys, y_errs)]).T
 
-    #x and y are arrays of datapoints
+    # x and y are arrays of datapoints
     for x, y in tqdm(zip(x_values, y_values)):
-
         r_value, _ = pearsonr(x,y)
         r_values.append(r_value)
 
     r_values = np.array(r_values)
-    z_values = .5 * np.log((1+r_values)/(1-r_values))
+    z_values = 0.5 * np.log((1+r_values)/(1-r_values))
 
     print("True R-value is: ", pearsonr(xs,ys).statistic)
     print("Predicted R-value is: ", np.mean(r_values))  
@@ -403,7 +386,7 @@ def plot_deceptiveness_factor(
         "gpt-4": "mediumseagreen",
     }
     colors = [colors_list[model] for model in models]
-    models = [MODEL_CONFIG_TO_NAME[model] for model in models] # hotfix for naming models well
+    models = [MODEL_CONFIG_TO_NAME[model] for model in models] # map to readable model name
 
     # remove None values from undefined deceptiveness factors (when supervisor gets 100% correct)
     capability = [c for i, c in enumerate(capability) if deceptiveness[i] is not None]
@@ -425,7 +408,6 @@ def plot_deceptiveness_factor(
     )
 
     # Construct the plot of deceptiveness vs. capability (using a different color for each model)
-
     fig, ax = plt.subplots()
     for model, color in colors_list.items():
         model = MODEL_CONFIG_TO_NAME[model] # hotfix from model naming
@@ -459,7 +441,6 @@ def plot_deceptiveness_factor(
     ax.grid(True, which='both', linestyle='--', linewidth=0.5)
     ax.set_facecolor('whitesmoke')
 
-    # LAKER: When saving to a file, record whether the error is SYSTEMATIC or STATISTICAL
     if deceiver_fixed:
         legend = ax.legend(loc='lower right')
     else:
@@ -467,6 +448,7 @@ def plot_deceptiveness_factor(
     plt.text(0.95, 0.97, f'r = {r_value[0]:.2f} +/- {r_value[1]:.2f}', transform=plt.gca().transAxes, horizontalalignment='right', verticalalignment='top', fontsize = 12, fontweight='bold')
     plt.tight_layout()
     plt.savefig(f"plots/{fixed_model}-{'deceiver' if deceiver_fixed else 'supervisor'}-{'stat' if plot_stat_err else 'syst'}-err.png", dpi=600)
+
 
 def make_filename_pairs(data_dir):
     filenames = [f"{data_dir}/{filename}" for filename in os.listdir(data_dir) if not os.path.isdir(f"{data_dir}/{filename}") and filename != ".DS_STORE"]
@@ -493,8 +475,9 @@ def make_filename_pairs(data_dir):
 
     return filename_pairs
 
+
 def make_fixed_supervisor_barplot(filename_pairs, stat_err=True):
-    # deceiver = 3rd atom in filename
+    # Note that deceiver is the 3rd atom in filename
     
     supervisor_name = utils.atoms_from_filename(filename_pairs[0][0])[4] # supervisor of first correct dataset
     
@@ -518,7 +501,6 @@ def make_fixed_supervisor_barplot(filename_pairs, stat_err=True):
     ordered_list_of_categories = [utils.atoms_from_filename(filename_pairs[0][0])[1]]
 
     for correct_filename, incorrect_filename in filename_pairs:
-
         category = utils.atoms_from_filename(correct_filename)[1]
 
         if category not in full_categories:
@@ -657,14 +639,16 @@ if __name__ == "__main__":
     #     print(f"\tDeceptiveness: {deceptiveness}")
     #     print(f"\tCapability: {capability}")
 
-    # # create a plotof deceptiveness by capability 
-    """plot_deceptiveness_factor(
-        filename_pairs,
-        supervisor_fixed=True,
-        deceiver_fixed=False,
-        plot_stat_err=False,
-        using_deceptiveness_v2=True,
-        using_ratio_x_axis=True,
-    )"""
 
+    # create a plot of deceptiveness by capability:
+    #plot_deceptiveness_factor(
+    #    filename_pairs,
+    #    supervisor_fixed=True,
+    #    deceiver_fixed=False,
+    #    plot_stat_err=False,
+    #    using_deceptiveness_v2=True,
+    #    using_ratio_x_axis=True,
+    #)
+
+    # create a barplot of deception overall:
     make_fixed_supervisor_barplot(filename_pairs, stat_err = False)
