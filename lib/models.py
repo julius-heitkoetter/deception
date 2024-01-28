@@ -318,6 +318,13 @@ class LlamaLLM():
             self.llama_model = base_model
         self.llama_model.eval()
 
+    def reset_all_steering(self):
+	for layer in self.llama_model.model.layers:
+	    layer.reset()
+
+    def set_steering_vector(self, layer, activations, do_projection=False):
+	self.llama_model.model.layers[layer].add(activations, do_projection)
+
     def __call__(
         self,
         prompt: str = None,
