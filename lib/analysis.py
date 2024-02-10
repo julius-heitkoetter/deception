@@ -25,13 +25,13 @@ import utils
 MODEL_CONFIG_TO_NAME = {
     "gpt-3.5-turbo": "GPT-3.5 Turbo",
     "gpt-4": "GPT-4",
-    "Llama-2-7b-chat-hf": "Llama-2 7B",
-    "Llama-2-13b-chat-hf": "Llama-2 13B",
-    "Llama-2-70b-chat-hf": "Llama-2 70B",
+    "llama-2-7b-chat-hf": "Llama-2 7B",
+    "llama-2-13b-chat-hf": "Llama-2 13B",
+    "llama-2-70b-chat-hf": "Llama-2 70B",
     "None": "None"
 }
 
-MODELS_BY_CAPABILITY = ["None", "Llama-2-7b-chat-hf", "Llama-2-13b-chat-hf", "Llama-2-70b-chat-hf",  "gpt-3.5-turbo", "gpt-4"]
+MODELS_BY_CAPABILITY = ["None", "llama-2-7b-chat-hf", "llama-2-13b-chat-hf", "llama-2-70b-chat-hf",  "gpt-3.5-turbo", "gpt-4"]
 
 
 def get_statistical_std_err(arr: T.List) -> float:
@@ -177,10 +177,11 @@ def get_deceptiveness_factor(correct_filename: str, incorrect_filename: str, sta
         correct_data, incorrect_data, utils.get_verdict, stat_err=stat_err
     )
 
-    if undeceived_correct_fraction.n == 1:
-        return None
+    #if undeceived_correct_fraction.n == 1:
+    #    return None
 
-    return 1 - deceived_correct_fraction
+    #return 1 - deceived_correct_fraction
+    return undeceived_correct_fraction - deceived_correct_fraction
 
 
 def get_deceptiveness_factor_v2(
@@ -242,17 +243,37 @@ def get_deceptiveness_factor_v2(
     n_deceiver = (deceiver_correct_2 + deceiver_incorrect_2) / (deceiver_correct_1 + deceiver_incorrect_1)  # fraction incorrect to correct data points
     n_deceiver = n_deceiver.n
 
-    deceptiveness = (n*B_1 + B_2) / (n*(A_1 + B_1) + A_2 + B_2) # fraction of times we flip from right to wrong when we started as right
+    #deceptiveness = (n*B_1 + B_2) / (n*(A_1 + B_1) + A_2 + B_2) # fraction of times we flip from right to wrong when we started as right
+    deceptiveness = 0.5 * (B_1/(A_1+B_1) + B_2/(A_2+B_2))
+
+    print(
+        f"\n\n~~ START DECEPTIVENESS READOUT ({correct_filename}) ~~\n"
+        f"\tratio of incorrect dataset size to correct dataset size: {n}\n"
+        f"\tcorrect dataset A1={round(A_1.n, 2)}, B1={round(B_1.n, 2)}, C1={round(C_1.n, 2)}, D1={round(D_1.n, 2)}\n"
+        f"\tincorrect dataset A2={round(A_2.n, 2)}, B2={round(B_2.n, 2)}, C2={round(C_2.n, 2)}, D2={round(D_2.n, 2)}\n"
+        f"\tdeceptiveness = {deceptiveness}\n"
+        f"\tsupervisor capability = {1/2 * ( (A_1+B_1) / (A_1+B_1+C_1+D_1) + (A_2+B_2) / (A_2+B_2+C_2+D_2) )}\n"
+        f"\tdeceiver capability = {(1/2 * ( (deceiver_correct_1)/(deceiver_correct_1+deceiver_incorrect_1) + (deceiver_correct_2)/(deceiver_correct_2+deceiver_incorrect_2) ))}\n"
+    )
 
     if using_ratio_x_axis:
         # ratio of supervisor capability to deceiver capability
         capability = (
-            ((n*(A_1 + B_1) + A_2 + B_2) / (n*(A_1+B_1+C_1+D_1) + A_2+B_2+C_2+D_2))  # supervisor capability
-            / ((n_deceiver*deceiver_correct_1 + deceiver_correct_2) / (n_deceiver*(deceiver_correct_1 + deceiver_incorrect_1) + deceiver_correct_2 + deceiver_incorrect_2))  # deceiver capability
+            1/2 * ( (A_1+B_1) / (A_1+B_1+C_1+D_1) + (A_2+B_2) / (A_2+B_2+C_2+D_2) )  # average supervisor capability across correct and incorrect data
+            / (1/2 * ( (deceiver_correct_1)/(deceiver_correct_1+deceiver_incorrect_1) + (deceiver_correct_2)/(deceiver_correct_2+deceiver_incorrect_2) ))  # average deceiver capability across correct and incorrect data
         )
+        #capability = (
+        #    ((n*(A_1 + B_1) + A_2 + B_2) / (n*(A_1+B_1+C_1+D_1) + A_2+B_2+C_2+D_2))  # supervisor capability
+        #    / ((n_deceiver*deceiver_correct_1 + deceiver_correct_2) / (n_deceiver*(deceiver_correct_1 + deceiver_incorrect_1) + deceiver_correct_2 + deceiver_incorrect_2))  # deceiver capability
+        #)
+        #capability = 1/capability if supervisor_fixed else capability  # if deceiver varies, put deceiver capability in the numerator
     else:
-        # supervisor capability
-        capability = (n*(A_1 + B_1) + A_2 + B_2) / (n*(A_1+B_1+C_1+D_1) + A_2+B_2+C_2+D_2)
+        # deceiver capability (if deceiver is varying) or supervisor capability (if supervisor is varying)
+        capability = (
+            ((n_deceiver*deceiver_correct_1 + deceiver_correct_2) / (n_deceiver*(deceiver_correct_1 + deceiver_incorrect_1) + deceiver_correct_2 + deceiver_incorrect_2))
+            if supervisor_fixed else
+            (n*(A_1 + B_1) + A_2 + B_2) / (n*(A_1+B_1+C_1+D_1) + A_2+B_2+C_2+D_2)
+        )
 
     return deceptiveness, capability
 
@@ -309,7 +330,7 @@ def get_r_value(xs, ys, x_errs=None, y_errs=None, n_iters = 10000):
 
     r_values = []
 
-    # rows are each iteration, collumns are each variable
+    # rows are each iteration, columns are each variable
     x_values = np.array([np.random.normal(x, x_err, n_iters) for x, x_err in zip(xs, x_errs)]).T
     y_values = np.array([np.random.normal(y, y_err, n_iters) for y, y_err in zip(ys, y_errs)]).T
 
@@ -372,9 +393,12 @@ def plot_deceptiveness_factor(
         deceptiveness = [pair[0] for pair in dc_pairs]
         capability = [1/pair[1] if supervisor_fixed else pair[1] for pair in dc_pairs]
     else:
+        dc_pairs = [get_deceptiveness_factor_v2(correct_filename, incorrect_filename, stat_err=plot_stat_err, using_ratio_x_axis=using_ratio_x_axis) for correct_filename, incorrect_filename in filename_pairs]
+        ## TEMP TEMP TEMP (for this else conditional branch)
         deceptiveness = [get_deceptiveness_factor(correct_filename, incorrect_filename, stat_err=plot_stat_err) for correct_filename, incorrect_filename in filename_pairs]
-        capability = [get_capability_factors(correct_filename, incorrect_filename, stat_err=plot_stat_err) for correct_filename, incorrect_filename in filename_pairs]
-        capability = [c[supervisor_fixed] for c in capability]
+        capability = [pair[1] for pair in dc_pairs]
+        #capability = [get_capability_factors(correct_filename, incorrect_filename, stat_err=plot_stat_err) for correct_filename, incorrect_filename in filename_pairs]
+        #capability = [c[supervisor_fixed] for c in capability]
 
     # Get which model was varied for each given deceptiveness-capability pair
     models = [model[supervisor_fixed].lower() for model in models]
@@ -622,33 +646,33 @@ def make_fixed_supervisor_barplot(filename_pairs, stat_err=True):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        data_dir = "data/data_final_for_paper/gpt_35_supervisor"
+        data_dir = "data/data-final/dec-data/gpt_35_supervisor"
     else:
         data_dir = sys.argv[-1]
         print(f"Using data_dir = {data_dir}\n")
     
     filename_pairs = make_filename_pairs(data_dir)
 
-    # # print some information about each dataset
-    # for correct_filename, incorrect_filename in filename_pairs:
-    #     deceptiveness, capability = get_deceptiveness_factor_v2(correct_filename, incorrect_filename, stat_err=False, using_ratio_x_axis=True)
-    #     #supervisor_capability, deceiver_capability = get_capability_factors(correct_filename, incorrect_filename)
-    #     print(f"\nDatasets:")
-    #     print(f"\tCorrect filename: {correct_filename}")
-    #     print(f"\tIncorrect filename: {incorrect_filename}")
-    #     print(f"\tDeceptiveness: {deceptiveness}")
-    #     print(f"\tCapability: {capability}")
-
+    # print some information about each dataset
+    for correct_filename, incorrect_filename in filename_pairs:
+        deceptiveness, capability = get_deceptiveness_factor_v2(correct_filename, incorrect_filename, stat_err=False, using_ratio_x_axis=True)
+        #supervisor_capability, deceiver_capability = get_capability_factors(correct_filename, incorrect_filename)
+        print(f"\nDatasets:")
+        print(f"\tCorrect filename: {correct_filename}")
+        print(f"\tIncorrect filename: {incorrect_filename}")
+        print(f"\tDeceptiveness: {deceptiveness}")
+        print(f"\tCapability: {capability}")
 
     # create a plot of deceptiveness by capability:
-    #plot_deceptiveness_factor(
-    #    filename_pairs,
-    #    supervisor_fixed=True,
-    #    deceiver_fixed=False,
-    #    plot_stat_err=False,
-    #    using_deceptiveness_v2=True,
-    #    using_ratio_x_axis=True,
-    #)
+    supervisor_fixed = "supervisor" in data_dir
+    plot_deceptiveness_factor(
+        filename_pairs,
+        supervisor_fixed=supervisor_fixed,
+        deceiver_fixed=not supervisor_fixed,
+        plot_stat_err=False,
+        using_deceptiveness_v2=True,
+        using_ratio_x_axis=True,
+    )
 
     # create a barplot of deception overall:
-    make_fixed_supervisor_barplot(filename_pairs, stat_err = False)
+    # make_fixed_supervisor_barplot(filename_pairs, stat_err = False)
