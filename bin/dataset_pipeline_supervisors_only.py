@@ -81,8 +81,10 @@ def run_pipeline_on_dataset(
         del evaluator
         del supervisor_llm
         gc.collect()
-        torch.cuda.synchronize()
-        torch.cuda.empty_cache()
+         
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run entire pipeline with multiple supervisors to generate qaeve dataset starting at a qae dataset.')
