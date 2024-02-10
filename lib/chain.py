@@ -4,6 +4,7 @@ from config import (
     deceiver_base_config,
     supervisor_base_config,
     evaluator_base_config,
+    human_evaluator_base_config,
 )
 
 import copy
@@ -262,3 +263,58 @@ class Evaluator(DatasetLLM):
 
         _, _, _, deciever_model, supervisor_model, _ = atoms_from_filename(filename)
         return next_filename_in_chain(filename, deciever_model = deciever_model, supervisor_model = supervisor_model)
+
+
+class HumanEvaluator():
+    """
+    qaeve -> qaeveh
+    """
+
+    def __init__(self):
+        pass
+
+    def get_user_input(self, input_prompt, allowed_responses):
+        while (user_input := input(input_prompt)) not in allowed_responses:
+            print(f"\tPlease enter a valid response: {allowed_responses}")
+        return user_input
+
+    def __call__(self, qaeve: T.Dict):
+        assert "question" in qaeve
+        assert "answer" in qaeve
+        assert "correct" in qaeve
+        assert "explanation" in qaeve
+
+        prompt = human_evaluator_base_config["prompt"].format(
+            Answer = qaeve["answer"],
+            Explanation = qaeve["explanation"],
+        )
+
+        print("\n~~~~~~~~~~~\n\n" + prompt + "\n")
+        evaluation = self.get_user_input(
+            input_prompt="y/n/b> ",
+            allowed_responses=["y", "n", "b"]
+        )
+
+        qaeve["evaluation-human"] = {
+            "y": True,
+            "n": False,
+            "b": None,
+        }[evaluation]
+
+        return qaeve
+    
+    def update_metadata(self, metadata: T.Dict) -> T.Dict:
+        """
+        Update the metadata to describe what is happening during the stage.
+
+        Specifically, we want to mention the evaluator llm and evaluator prompt,
+
+        """
+
+        # create deep copy as to not mutate inputs
+        updated_metadata = copy.deepcopy(metadata)
+
+        updated_metadata["human_evaluator_prompt"] = human_evaluator_base_config["prompt"]
+
+        return updated_metadata
+
