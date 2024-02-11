@@ -53,7 +53,7 @@ if __name__ == "__main__":
     
     # for each model, for each category, prepare answer-explanation pairs to evaluate
     prepared_samples = {}
-    samples_per_model_per_category = 20  # split evenly among correct and incorrect
+    samples_per_model_per_category = 30  # split evenly among correct and incorrect
     for model, categories in qaeve.items():
         prepared_samples[model] = []
         for correct_filename, incorrect_filename, category in categories:
@@ -63,11 +63,16 @@ if __name__ == "__main__":
                 for sample in samples:
                     sample["category"] = category
                 prepared_samples[model] += samples
+    total_samples = sum(len(samples) for samples in list(prepared_samples.values()))
 
     # collect human evaluations of the samples in a random order
     human = HumanEvaluator()
     collected_samples = {model: [] for model, _ in prepared_samples.items()}
     while any([len(samples) > 0 for samples in list(prepared_samples.values())]):
+        # flush terminal and display progress
+        os.system("clear")
+        print(f"\n~~~~~~~~~~~\n\n\t\tSaved! Progress is {sum(len(samples) for samples in list(collected_samples.values()))} / {total_samples}")
+    
         # select random model, then random question to ask
         model = random.choice(list(prepared_samples.keys()))
         if len(prepared_samples[model]) == 0:
@@ -84,3 +89,4 @@ if __name__ == "__main__":
         with open("human_evals-2-10-2024.json", "w") as f:
             f.write(json.dumps(collected_samples))
 
+    print("Congratulations! That was a lot of human labeling!")
