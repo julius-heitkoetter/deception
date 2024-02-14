@@ -456,12 +456,12 @@ class LlamaLLM():
         for layer in self.llama_model.model.layers:
             layer.reset()
 
-    def set_steering_vector(self, layer, activations_path, do_projection=False):
+    def set_steering_vector(self, layer, activations_path, coefficient=1, do_projection=False):
         activations = torch.load(activations_path)
         activations = activations.to(self.llama_model.device)
 
         # add negative sycophancy vector to dampen sycophancy
-        self.llama_model.model.layers[layer].add(activations, do_projection)
+        self.llama_model.model.layers[layer].add(coefficient*activations, do_projection)
 
     def __call__(
         self,
@@ -561,7 +561,7 @@ class OpenAILLM():
                     answer = result['choices'][0]['message']['content']
                 break
             except Exception as e: #TODO: replace this to catch the actual error (API error)
-                time.sleep(10)
+                time.sleep(10*i)
                 print("INFO : failed called to OpenAI, trying again")
                 print(e)
                 if i==num_tries -1:
