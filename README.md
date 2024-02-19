@@ -4,7 +4,7 @@
 
 ### Create a python environment
 
-Create a python environemtn with the correct packages, as specified in `requirements.txt` and python3.10.
+Create a python environment with the correct packages, as specified in `requirements.txt` and python3.10.
 
 One recommended way to do this is to first create a conda environment and activate it
 
