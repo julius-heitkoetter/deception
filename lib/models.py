@@ -1,6 +1,8 @@
 import torch
 import openai
 from typing import Any, Callable, List, Optional
+import os
+import time
 
 import numpy as np
 import itertools
@@ -260,9 +262,137 @@ class CoT(ToT):
             self.num_generate_samples = 1 
             if self.verbose:
                 print("INFO: overriding num_generate_samples to be 1 for CoT")
-    
+
+# github.com/nrimsky/CAA   
+def add_vector_after_position(
+    matrix, vector, position_ids, after=None, do_projection=True
+):
+    after_id = after
+    if after_id is None:
+        after_id = position_ids.min().item() - 1
+    mask = position_ids > after_id
+    mask = mask.unsqueeze(-1)
+    if do_projection:
+        matrix = project_onto_orthogonal_complement(matrix, vector)
+    matrix += mask.float() * vector
+    return matrix
 
 
+# github.com/nrimsky/CAA
+def project_onto_orthogonal_complement(tensor, onto):
+    """
+    Projects tensor onto the orthogonal complement of the span of onto.
+    """
+    # Get the projection of tensor onto onto
+    proj = (
+        torch.sum(tensor * onto, dim=-1, keepdim=True)
+        * onto
+        / (torch.norm(onto, dim=-1, keepdim=True) ** 2 + 1e-10)
+    )
+    # Subtract to get the orthogonal component
+    return tensor - proj
+
+# github.com/nrimsky/CAA
+class AttnWrapper(torch.nn.Module):
+    """
+    Wrapper for attention mechanism to save activations
+    """
+
+    def __init__(self, attn):
+        super().__init__()
+        self.attn = attn
+        self.activations = None
+
+    def forward(self, *args, **kwargs):
+        output = self.attn(*args, **kwargs)
+        self.activations = output[0]
+        return output
+
+# github.com/nrimsky/CAA
+class BlockOutputWrapper(torch.nn.Module):
+    """
+    Wrapper for block to save activations and unembed them
+    """
+
+    def __init__(self, block, unembed_matrix, norm, tokenizer):
+        super().__init__()
+        self.block = block
+        self.unembed_matrix = unembed_matrix
+        self.norm = norm
+        self.tokenizer = tokenizer
+
+        self.block.self_attn = AttnWrapper(self.block.self_attn)
+        self.post_attention_layernorm = self.block.post_attention_layernorm
+
+        self.attn_out_unembedded = None
+        self.intermediate_resid_unembedded = None
+        self.mlp_out_unembedded = None
+        self.block_out_unembedded = None
+
+        self.activations = None
+        self.add_activations = None
+        self.after_position = None
+
+        self.save_internal_decodings = False
+        self.do_projection = False
+
+        self.calc_dot_product_with = None
+        self.dot_products = []
+
+    def forward(self, *args, **kwargs):
+        output = self.block(*args, **kwargs)
+        self.activations = output[0]
+        if self.calc_dot_product_with is not None:
+            last_token_activations = self.activations[0, -1, :]
+            decoded_activations = self.unembed_matrix(self.norm(last_token_activations))
+            top_token_id = torch.topk(decoded_activations, 1)[1][0]
+            top_token = self.tokenizer.decode(top_token_id)
+            dot_product = torch.dot(last_token_activations, self.calc_dot_product_with) / (torch.norm(
+                last_token_activations
+            )  * torch.norm(self.calc_dot_product_with))
+            self.dot_products.append((top_token, dot_product.cpu().item()))
+        if self.add_activations is not None:
+            augmented_output = add_vector_after_position(
+                matrix=output[0],
+                vector=self.add_activations,
+                position_ids=kwargs["position_ids"],
+                after=self.after_position,
+                do_projection=self.do_projection,
+            )
+            output = (augmented_output,) + output[1:]
+
+        if not self.save_internal_decodings:
+            return output
+
+        # Whole block unembedded
+        self.block_output_unembedded = self.unembed_matrix(self.norm(output[0]))
+
+        # Self-attention unembedded
+        attn_output = self.block.self_attn.activations
+        self.attn_out_unembedded = self.unembed_matrix(self.norm(attn_output))
+
+        # Intermediate residual unembedded
+        attn_output += args[0]
+        self.intermediate_resid_unembedded = self.unembed_matrix(self.norm(attn_output))
+
+        # MLP unembedded
+        mlp_output = self.block.mlp(self.post_attention_layernorm(attn_output))
+        self.mlp_out_unembedded = self.unembed_matrix(self.norm(mlp_output))
+
+        return output
+
+    def add(self, activations, do_projection=False):
+        self.add_activations = activations
+        self.do_projection = do_projection
+
+    def reset(self):
+        self.add_activations = None
+        self.activations = None
+        self.block.self_attn.activations = None
+        self.after_position = None
+        self.do_projection = False
+        self.calc_dot_product_with = None
+        self.dot_products = []
 
 class LlamaLLM():
     """
@@ -295,7 +425,7 @@ class LlamaLLM():
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        self.name = "llama"
+        self.name = os.path.basename(self.base_model)
 
         #Packages needed
         from peft import PeftModel
@@ -314,12 +444,31 @@ class LlamaLLM():
             self.llama_model = PeftModel.from_pretrained(base_model, self.peft_model)
         else:
             self.llama_model = base_model
+
+        for i, layer in enumerate(self.llama_model.model.layers):
+            self.llama_model.model.layers[i] = BlockOutputWrapper(
+                layer, self.llama_model.lm_head, self.llama_model.model.norm, self.tokenizer
+            )
+        
         self.llama_model.eval()
+
+    def reset_all_steering(self):
+        for layer in self.llama_model.model.layers:
+            layer.reset()
+
+    def set_steering_vector(self, layer, activations_path, coefficient=1, do_projection=False):
+        activations = torch.load(activations_path)
+        activations = activations.to(self.llama_model.device)
+
+        # add negative sycophancy vector to dampen sycophancy
+        self.llama_model.model.layers[layer].add(coefficient*activations, do_projection)
 
     def __call__(
         self,
         prompt: str = None,
+        get_logprobs: bool = False,
         stop: Optional[List[str]] = None,
+        device: str = "cuda",
     ) -> str:
         
         if self.verbose:
@@ -327,11 +476,30 @@ class LlamaLLM():
 
         # prepare input
         batch = self.tokenizer(["[INST]" + prompt + "[/INST]"], padding='max_length', truncation=True,max_length=self.max_padding_length,return_tensors="pt")
-        batch = {k: v.to("cuda") for k, v in batch.items()}
+        batch = {k: v.to(device) for k, v in batch.items()}
 
         # perform inference
         with torch.no_grad():
-            outputs = self.llama_model.generate(
+            if get_logprobs:
+                outputs = self.llama_model.generate(
+                    **batch,
+                    max_new_tokens=self.max_new_tokens,
+                    do_sample=self.do_sample,
+                    top_p=self.top_p,
+                    temperature=self.temperature,
+                    min_length=self.min_length,
+                    use_cache=self.use_cache,
+                    top_k=self.top_k,
+                    repetition_penalty=self.repetition_penalty,
+                    length_penalty=self.length_penalty,
+                    return_dict_in_generate=True,
+                    device=device
+                )
+                log_probs = outputs.log_probs
+
+                return log_probs
+            else:
+                outputs = self.llama_model.generate(
                     **batch,
                     max_new_tokens=self.max_new_tokens,
                     do_sample=self.do_sample,
@@ -343,7 +511,7 @@ class LlamaLLM():
                     repetition_penalty=self.repetition_penalty,
                     length_penalty=self.length_penalty,
                 )
-            
+
         output_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         answer = output_text[output_text.rfind("[/INST]") + len("[/INST]"):]
 
@@ -367,6 +535,7 @@ class OpenAILLM():
     def __call__(
         self,
         prompt: str = None,
+        get_logprobs: bool = False,
         stop: Optional[List[str]] = None,
     ) -> str:
         
@@ -375,11 +544,29 @@ class OpenAILLM():
         
         system_intel = "You are OpenAI's GPT model, answer my questions as correctly as you can."
 
-        result = openai.ChatCompletion.create(model=self.model_name,
-                                 messages=[{"role": "system", "content": system_intel},
-                                           {"role": "user", "content": prompt}])
-        
-        answer = result['choices'][0]['message']['content']
+        num_tries = 5
+        for i in range(num_tries):
+            try:
+                if get_logprobs:
+                    result = openai.ChatCompletion.create(model=self.model_name,
+                                         messages=[{"role": "system", "content": system_intel},
+                                                   {"role": "user", "content": prompt}],
+                                         logprobs=True,
+                                         top_logprobs=5)
+                    answer = result
+                else:
+                    result = openai.ChatCompletion.create(model=self.model_name,
+                                         messages=[{"role": "system", "content": system_intel},
+                                                   {"role": "user", "content": prompt}])
+                    answer = result['choices'][0]['message']['content']
+                break
+            except Exception as e: #TODO: replace this to catch the actual error (API error)
+                time.sleep(10*i)
+                print("INFO : failed called to OpenAI, trying again")
+                print(e)
+                if i==num_tries -1:
+                    print("ERROR : max number of retries reached") 
+                    answer = "OPENAI ERROR"       
 
         if self.verbose:
             print("INFO: output from OpenAI LLM: ", answer)
