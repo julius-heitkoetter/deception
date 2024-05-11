@@ -4,7 +4,7 @@
 
 The trustworthiness of highly capable language models is put at risk when they are able to produce deceptive outputs. Moreover, when models are vulnerable to deception it undermines reliability. We introduce a framework to investigate complex, model-on-model deceptive scenarios and establish baselines for model deception and susceptibility to deception, using questions from MMLU. Using our framework, anyone can check how deceptive their own models are and how likely their models are to fall for deception.
 
-Additionally, in our paper, we create a dataset of over 10,000 misleading explanations by asking Llama-2 7B, 13B, 70B, and GPT-3.5 to justify the wrong answer for questions in the MMLU. We find the all of these models are high deception and that weak models are more volunerable to deception. 
+Additionally, in our [paper](https://julius-heitkoetter.github.io/deception/blob/an_assessment_of_model-on-model_deception.pdf), we create a dataset of over 10,000 misleading explanations by asking Llama-2 7B, 13B, 70B, and GPT-3.5 to justify the wrong answer for questions in the MMLU. We find the all of these models are high deception and that weak models are more volunerable to deception. 
 
 ## Setup
 
